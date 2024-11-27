@@ -2,6 +2,7 @@ package hl7_test
 
 import (
 	"testing"
+	"time"
 
 	"github.com/esequiel378/hl7"
 )
@@ -33,6 +34,50 @@ func TestAll(t *testing.T) {
 
 	if err := hl7.Unmarshal([]byte(raw), &st); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestTimeField(t *testing.T) {
+	// Raw HL7 message with a timestamp in the "YYYYMMDDHHMM" format.
+	raw := "MSH|^~\\&||.|||1999-05-29T23:00:00Z||ADT^A04|ADT.1.1698593|P|2.7"
+
+	var st struct {
+		Header struct {
+			DateTimeOfMessage time.Time `hl7:"6"`
+		} `hl7:"segment:MSH"`
+	}
+
+	if err := hl7.Unmarshal([]byte(raw), &st); err != nil {
+		t.Fatal(err)
+	}
+
+	expectedTime, err := time.Parse("200601021504", "199905292300")
+	if err != nil {
+		t.Fatalf("Failed to parse expected time: %v", err)
+	}
+
+	if !st.Header.DateTimeOfMessage.Equal(expectedTime) {
+		t.Fatalf("DateTimeOfMessage mismatch: got %v, want %v",
+			st.Header.DateTimeOfMessage, expectedTime)
+	}
+}
+
+func TestEmptyTimeField(t *testing.T) {
+	// Raw HL7 message with a timestamp in the "YYYYMMDDHHMM" format.
+	raw := "MSH|^~\\&||.|||||ADT^A04|ADT.1.1698593|P|2.7"
+
+	var st struct {
+		Header struct {
+			DateTimeOfMessage *time.Time `hl7:"6"`
+		} `hl7:"segment:MSH"`
+	}
+
+	if err := hl7.Unmarshal([]byte(raw), &st); err != nil {
+		t.Fatal(err)
+	}
+
+	if st.Header.DateTimeOfMessage != nil {
+		t.Fatalf("DateTimeOfMessage mismatch: got %v, want nil", st.Header.DateTimeOfMessage)
 	}
 }
 

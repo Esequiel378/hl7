@@ -5,12 +5,14 @@ import (
 	"fmt"
 	"reflect"
 	"strconv"
+	"time"
 )
 
 var (
 	ErrInvalidBooleanValue = errors.New("fixedlength: invalid boolean value")
 	ErrInvalidIntValue     = errors.New("fixedlength: invalid int value")
 	ErrInvalidFloatValue   = errors.New("fixedlength: invalid float value")
+	ErrInvalidTimeValue    = errors.New("invalid time value")
 	ErrUnsupportedKind     = errors.New("fixedlength: unsupported kind")
 )
 
@@ -59,6 +61,19 @@ func setFieldValue(field reflect.Value, value string) error {
 		}
 		field.SetBool(boolVal)
 
+	case reflect.Struct:
+		switch field.Type() {
+		case reflect.TypeOf(time.Time{}):
+			// Parse time.Time values using RFC 3339 format.
+			parsedTime, err := time.Parse(time.RFC3339, value)
+			if err != nil {
+				return fmt.Errorf("%w: invalid time value %q", ErrInvalidTimeValue, value)
+			}
+
+			field.Set(reflect.ValueOf(parsedTime))
+		default:
+			return fmt.Errorf("%w: unsupported struct type %s", ErrUnsupportedKind, field.Type())
+		}
 	default:
 		if implementsUnmarshaler(field) {
 			// no need to check if the field is addressable because implementsUnmarshaler already does that
