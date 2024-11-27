@@ -35,3 +35,31 @@ func TestAll(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestEmptyField(t *testing.T) {
+	raw := "MSH|^~\\&||.|||199908180016||ADT^A04|ADT.1.1698593|P|2.7"
+
+	var st struct {
+		Header struct {
+			EncodingCharacters *string `hl7:"2"`
+		} `hl7:"segment:MSH"`
+	}
+
+	if err := hl7.Unmarshal([]byte(raw), &st); err != nil {
+		t.Fatal(err)
+	}
+
+	if st.Header.EncodingCharacters != nil {
+		t.Fatalf("expected nil got %s", *st.Header.EncodingCharacters)
+	}
+
+	raw = "MSH|^~\\&|*|.|||199908180016||ADT^A04|ADT.1.1698593|P|2.7"
+
+	if err := hl7.Unmarshal([]byte(raw), &st); err != nil {
+		t.Fatal(err)
+	}
+
+	if st.Header.EncodingCharacters == nil {
+		t.Fatalf("expected * got %s", *st.Header.EncodingCharacters)
+	}
+}
