@@ -10,6 +10,37 @@ import (
 	"strings"
 )
 
+// Unmarshaler is the interface implemented by types
+// that can unmarshal themselves.
+// Unmarshal must copy the input data if it wishes
+// to retain the data after returning.
+type Unmarshaler interface {
+	Unmarshal([]byte) error
+}
+
+var unmarshalerType = reflect.TypeOf((*Unmarshaler)(nil)).Elem()
+
+// implementsUnmarshaler checks if a field implements the Unmarshaler interface
+func implementsUnmarshaler(val reflect.Value) bool {
+	// If the value is invalid (e.g., a nil value), return false
+	if !val.IsValid() {
+		return false
+	}
+
+	// Check if the value itself implements json.Unmarshaler
+	if val.Type().Implements(unmarshalerType) {
+		return true
+	}
+
+	// If the value is addressable, check if the pointer to it implements json.Unmarshaler
+	if val.CanAddr() {
+		return val.Addr().Type().Implements(unmarshalerType)
+	}
+
+	// Otherwise, it does not implement the interface
+	return false
+}
+
 // InvalidMessageParserError describes an invalid argument passed to the parser.
 type InvalidMessageParserError struct {
 	Type reflect.Type
@@ -120,9 +151,8 @@ func setValuesByIndex(parent reflect.Value, values []string) error {
 }
 
 var (
-	errTagEmtpy            = errors.New("hl7: tag is empty")
-	ErrTagInvalidFormat    = errors.New("hl7: tag is not in the correct format, expected `hl7:\"segment:<name>\"`")
-	ErrInvalidBooleanValue = errors.New("hl7: invalid boolean value")
+	errTagEmtpy         = errors.New("hl7: tag is empty")
+	ErrTagInvalidFormat = errors.New("hl7: tag is not in the correct format, expected `hl7:\"segment:<name>\"`")
 )
 
 // getHL7SegmentTypeFromTag parses the "hl7" tag to extract the segment name.
@@ -145,20 +175,27 @@ func getHL7FieldIndexFromTag(tag string) (int, error) {
 	return strconv.Atoi(tag) // Convert tag to int
 }
 
+var (
+	ErrInvalidBooleanValue = errors.New("fixedlength: invalid boolean value")
+	ErrInvalidIntValue     = errors.New("fixedlength: invalid int value")
+	ErrInvalidFloatValue   = errors.New("fixedlength: invalid float value")
+	ErrUnsupportedKind     = errors.New("fixedlength: unsupported kind")
+)
+
 // setFieldValue sets the value for a struct field using reflection.
 func setFieldValue(field reflect.Value, value string) error {
 	switch field.Kind() {
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 		intVal, err := strconv.ParseInt(value, 10, 64)
 		if err != nil {
-			return fmt.Errorf("cannot convert value '%s' to int: %w", value, err)
+			return errors.Join(ErrInvalidIntValue, err)
 		}
 		field.SetInt(intVal)
 
 	case reflect.Float32, reflect.Float64:
 		floatVal, err := strconv.ParseFloat(value, 64)
 		if err != nil {
-			return fmt.Errorf("cannot convert value '%s' to float: %w", value, err)
+			return errors.Join(ErrInvalidFloatValue, err)
 		}
 		field.SetFloat(floatVal)
 
@@ -168,13 +205,17 @@ func setFieldValue(field reflect.Value, value string) error {
 	case reflect.Bool:
 		boolVal, err := strconv.ParseBool(value)
 		if err != nil {
-			return fmt.Errorf("cannot convert value '%s' to bool: %w", value, ErrInvalidBooleanValue)
+			return errors.Join(ErrInvalidBooleanValue, err)
 		}
 		field.SetBool(boolVal)
 
 	default:
-		// Support for other types can be added here
-		return fmt.Errorf("unsupported kind: %s", field.Kind())
+		if implementsUnmarshaler(field) {
+			um := field.Addr().Interface().(Unmarshaler)
+			return um.Unmarshal([]byte(value))
+		}
+
+		return fmt.Errorf("%w: %s", ErrUnsupportedKind, field.Kind())
 	}
 	return nil
 }
