@@ -11,8 +11,6 @@ var (
 	ErrTagInvalidFormat   = errors.New("hl7: tag is not in the correct format, expected `hl7:\"segment:<name>\"`")
 )
 
-var errTagEmtpy = errors.New("hl7: tag is empty")
-
 // InvalidMessageParserError describes an invalid argument passed to the parser.
 type InvalidMessageParserError struct {
 	Type reflect.Type
