@@ -6,8 +6,8 @@ Whether you're building healthcare services or integrating HL7 messaging into yo
 
 ## Features
 
-- Struct Tag Parsing: Define HL7 mappings with intuitive struct tags (hl7:"segment:<name>" and hl7:"<index>").
-Nested Structs: Easily manage complex fields like patient names or addresses separated by the caret (^).
+- Struct Tag Parsing: Define HL7 mappings with intuitive struct tags (hl7:"segment:\<name\>" and hl7:"\<index\>").
+- Nested Structs: Easily manage complex fields like patient names or addresses separated by the caret (^).
 - Version Agnostic: Supports parsing any HL7 version, offering flexibility for custom and standard implementations.
 - Error Handling: Leverages Go's built-in error system for detailed error reporting.
 - Dependency-Free: No external dependencies—ready to go out of the box.
