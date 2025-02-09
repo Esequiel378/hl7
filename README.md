@@ -64,7 +64,46 @@ func main() {
 Output
 
 ```plaintext
-Parsed Message: {Header:{Segment:MSH FieldSeparator:^ EncodingCharacters:~\& DateTimeOfMessage:199908180016 MessageType:ADT^A04 VersionID:2.7}}
+Parsed Message: {Header:{Segment:MSH FieldSeparator:^~\& EncodingCharacters: DateTimeOfMessage: MessageType:ADT.1.1698593 VersionID:}}
+```
+
+## Using hl7 with go-playground/validator
+
+You can use hl7 together with [go-playground/validator](https://github.com/go-playground/validator) to validate parsed HL7 messages. This ensures that your data adheres to required constraints before further processing.
+
+### Example: Parsing and Validating HL7 Messages
+
+Here's an example demonstrating how to parse an HL7 message and validate its fields:
+
+```go
+package main
+
+import (
+	"fmt"
+	"github.com/esequiel378/hl7"
+)
+
+func main() {
+	raw := "MSH|^~\\&||.|||199908180016||ADT^A04|ADT.1.1698593|P|2.7"
+
+	var message struct {
+		Header struct {
+			Segment            string `hl7:"0"`
+			FieldSeparator     string `hl7:"1"`
+			EncodingCharacters string `hl7:"2"`
+			DateTimeOfMessage  string `hl7:"7"`
+			MessageType        string `hl7:"9"`
+			VersionID          string `hl7:"12"`
+		} `hl7:"segment:MSH"`
+	}
+
+	if err := hl7.Unmarshal([]byte(raw), &message); err != nil {
+		fmt.Println("Error:", err)
+		return
+	}
+
+	fmt.Printf("Parsed Message: %+v\n", message)
+}
 ```
 
 ## Contribution

@@ -71,13 +71,26 @@ func Unmarshal(data []byte, v any) error {
 		tagToField[tag] = field
 	}
 
+	fieldSeparator := "|"
+	encodingCharacters := "^~\\&"
+
 	// Scan the HL7 message line by line
 	scanner := bufio.NewScanner(bytes.NewReader(data))
 	for scanner.Scan() {
 		line := scanner.Text()
-		parts := strings.Split(line, "|")
+
+		// Extract the field separator from the MSH segment if present
+		if strings.HasPrefix(line, "MSH") {
+			fieldSeparator = string(line[3])
+		}
+
+		parts := strings.Split(line, fieldSeparator)
 		if len(parts) == 0 {
 			continue
+		}
+
+		if strings.HasPrefix(parts[0], "MSH") {
+			encodingCharacters = parts[1]
 		}
 
 		segment := Segment(parts[0])
@@ -91,7 +104,7 @@ func Unmarshal(data []byte, v any) error {
 		}
 
 		// Populate the struct fields with parsed values
-		if err := setValuesByIndex(segmentField, parts); err != nil {
+		if err := setValuesByIndex(segment, segmentField, parts, fieldSeparator, encodingCharacters, 0); err != nil {
 			return err
 		}
 	}
@@ -99,34 +112,53 @@ func Unmarshal(data []byte, v any) error {
 	return nil
 }
 
+var ErrFieldIndexOutOfBounds = errors.New("hl7: field index out of bounds")
+
 // setValuesByIndex maps HL7 field values to struct fields using the hl7 tags.
-func setValuesByIndex(parent reflect.Value, values []string) error {
+func setValuesByIndex(segment Segment, parent reflect.Value, fields []string, fs, ec string, level uint) error {
+	componentSeparator := string(ec[0])
+
 	for i := 0; i < parent.NumField(); i++ {
-		field := parent.Field(i)
-		idx, err := getHL7FieldIndexFromTag(parent.Type().Field(i).Tag.Get("hl7"))
+		parentField := parent.Field(i)
+		sIndex, err := getHL7FieldIndexFromTag(parent.Type().Field(i).Tag.Get("hl7"))
 		if err != nil {
 			return err
 		}
-		if idx >= len(values) {
-			continue // Skip if the index is out of bounds
+
+		// HL7 is 1-based, so we need to decrement the index
+		sIndex = sIndex - 1
+
+		if sIndex >= len(fields) || sIndex < 0 {
+			return fmt.Errorf("%w: %s", ErrFieldIndexOutOfBounds, parent.Type().Field(i).Name)
 		}
 
-		value := values[idx]
-		parts := strings.Split(value, "^")
+		sField := fields[sIndex]
+		shouldSetFS := segment == "MSH" && level == 0 && sIndex == 0
+		if shouldSetFS {
+			sField = fs
+		}
 
-		// Handle nested structs recursively
-		if len(parts) > 1 && field.Kind() == reflect.Struct {
-			if err := setValuesByIndex(field, parts); err != nil {
+		components := strings.Split(sField, componentSeparator)
+
+		// TODO: Add support for subcomponent separator
+		// TODO: Add support for repetition separator
+		shouldParseComponents := len(components) > 1 && parentField.Kind() == reflect.Struct
+
+		// Handle components recursively
+		if shouldParseComponents {
+			if err := setValuesByIndex(segment, parentField, components, fs, ec, level+1); err != nil {
 				return err
 			}
+
 			continue
 		}
 
 		// Set field value based on its type
-		if err := setFieldValue(field, value); err != nil {
+		if err := setFieldValue(parentField, sField); err != nil {
 			return err
 		}
 	}
+
 	return nil
 }
 
