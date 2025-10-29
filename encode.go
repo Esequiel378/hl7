@@ -8,11 +8,11 @@ import (
 )
 
 var (
-	ErrInvalidBooleanValue = errors.New("fixedlength: invalid boolean value")
-	ErrInvalidIntValue     = errors.New("fixedlength: invalid int value")
-	ErrInvalidUintValue    = errors.New("fixedlength: invalid uint value")
-	ErrInvalidFloatValue   = errors.New("fixedlength: invalid float value")
-	ErrUnsupportedKind     = errors.New("fixedlength: unsupported kind")
+	ErrInvalidBooleanValue = errors.New("hl7: invalid boolean value")
+	ErrInvalidIntValue     = errors.New("hl7: invalid int value")
+	ErrInvalidUintValue    = errors.New("hl7: invalid uint value")
+	ErrInvalidFloatValue   = errors.New("hl7: invalid float value")
+	ErrUnsupportedKind     = errors.New("hl7: unsupported kind")
 )
 
 var (

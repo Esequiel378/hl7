@@ -27,12 +27,12 @@ func implementsUnmarshaler(val reflect.Value) bool {
 		return false
 	}
 
-	// Check if the value itself implements json.Unmarshaler
+	// Check if the value itself implements Unmarshaler
 	if val.Type().Implements(unmarshalerType) {
 		return true
 	}
 
-	// If the value is addressable, check if the pointer to it implements json.Unmarshaler
+	// If the value is addressable, check if the pointer to it implements Unmarshaler
 	if val.CanAddr() {
 		return val.Addr().Type().Implements(unmarshalerType)
 	}
@@ -58,7 +58,7 @@ func Unmarshal(data []byte, v any) error {
 	for i := 0; i < rv.Elem().NumField(); i++ {
 		field := rv.Elem().Field(i)
 		tag, err := getHL7SegmentTypeFromTag(rv.Elem().Type().Field(i).Tag.Get("hl7"))
-		if errors.Is(err, errTagEmtpy) {
+		if errors.Is(err, errTagEmpty) {
 			continue
 		}
 		if err != nil {
@@ -76,6 +76,8 @@ func Unmarshal(data []byte, v any) error {
 
 	// Scan the HL7 message line by line
 	scanner := bufio.NewScanner(bytes.NewReader(data))
+	// Increase the scanner buffer to handle long HL7 segments
+	scanner.Buffer(make([]byte, 0, 1024*1024), 10*1024*1024)
 	for scanner.Scan() {
 		line := scanner.Text()
 
@@ -128,8 +130,9 @@ func setValuesByIndex(segment Segment, parent reflect.Value, fields []string, fs
 		// HL7 is 1-based, so we need to decrement the index
 		sIndex = sIndex - 1
 
+		// If the field index is out of bounds or invalid, skip assignment (treat as optional)
 		if sIndex >= len(fields) || sIndex < 0 {
-			return fmt.Errorf("%w: %s", ErrFieldIndexOutOfBounds, parent.Type().Field(i).Name)
+			continue
 		}
 
 		sField := fields[sIndex]
@@ -162,12 +165,12 @@ func setValuesByIndex(segment Segment, parent reflect.Value, fields []string, fs
 	return nil
 }
 
-var errTagEmtpy = errors.New("hl7: tag is empty")
+var errTagEmpty = errors.New("hl7: tag is empty")
 
 // getHL7SegmentTypeFromTag parses the "hl7" tag to extract the segment name.
 func getHL7SegmentTypeFromTag(tag string) (Segment, error) {
 	if tag == "" {
-		return "", errTagEmtpy
+		return "", errTagEmpty
 	}
 	parts := strings.Split(tag, ":")
 	if len(parts) < 2 || parts[0] != "segment" {
@@ -179,7 +182,7 @@ func getHL7SegmentTypeFromTag(tag string) (Segment, error) {
 // getHL7FieldIndexFromTag parses the "hl7" tag to extract the field index.
 func getHL7FieldIndexFromTag(tag string) (int, error) {
 	if tag == "" {
-		return 0, errTagEmtpy
+		return 0, errTagEmpty
 	}
 	return strconv.Atoi(tag) // Convert tag to int
 }

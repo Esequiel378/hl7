@@ -28,7 +28,7 @@ Here's a basic example of using hl7 to parse a raw HL7 message into a Go struct:
 MSH|^~\&||.|||199908180016||ADT^A04|ADT.1.1698593|P|2.7
 ```
 
-Corresponding Go Struct
+Corresponding Go Struct (1-based indices)
 
 ```go
 package main
@@ -43,7 +43,6 @@ func main() {
 
 	var message struct {
 		Header struct {
-			Segment            string `hl7:"0"`
 			FieldSeparator     string `hl7:"1"`
 			EncodingCharacters string `hl7:"2"`
 			DateTimeOfMessage  string `hl7:"7"`
@@ -64,7 +63,7 @@ func main() {
 Output
 
 ```plaintext
-Parsed Message: {Header:{Segment:MSH FieldSeparator:^~\& EncodingCharacters: DateTimeOfMessage: MessageType:ADT.1.1698593 VersionID:}}
+Parsed Message: {Header:{FieldSeparator:| EncodingCharacters:^~\& DateTimeOfMessage:199908180016 MessageType:ADT^A04 VersionID:2.7}}
 ```
 
 ## Using hl7 with go-playground/validator
