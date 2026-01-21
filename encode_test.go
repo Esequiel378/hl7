@@ -26,7 +26,7 @@ func (c *CustomUnmarshaler) Unmarshal(data []byte) error {
 
 func createField(kind reflect.Kind, elemKind reflect.Kind) reflect.Value {
 	switch kind {
-	case reflect.Ptr:
+	case reflect.Pointer:
 		return createPtrField(elemKind)
 	case reflect.Slice:
 		return reflect.ValueOf([]int{})
@@ -354,35 +354,35 @@ func TestSetFieldValue(t *testing.T) {
 		// Pointer types
 		{
 			name:          "pointer_int_valid",
-			kind:          reflect.Ptr,
+			kind:          reflect.Pointer,
 			elemKind:      reflect.Int64,
 			value:         "123",
 			wantElemValue: int64(123),
 		},
 		{
 			name:          "pointer_uint_valid",
-			kind:          reflect.Ptr,
+			kind:          reflect.Pointer,
 			elemKind:      reflect.Uint,
 			value:         "42",
 			wantElemValue: uint(42),
 		},
 		{
 			name:          "pointer_float32_valid",
-			kind:          reflect.Ptr,
+			kind:          reflect.Pointer,
 			elemKind:      reflect.Float32,
 			value:         "3.14",
 			wantElemValue: float32(3.14),
 		},
 		{
 			name:          "pointer_string_empty",
-			kind:          reflect.Ptr,
+			kind:          reflect.Pointer,
 			elemKind:      reflect.String,
 			value:         "",
 			wantElemValue: "",
 		},
 		{
 			name:          "pointer_bool_valid_true",
-			kind:          reflect.Ptr,
+			kind:          reflect.Pointer,
 			elemKind:      reflect.Bool,
 			value:         "true",
 			wantElemValue: true,
@@ -391,14 +391,14 @@ func TestSetFieldValue(t *testing.T) {
 		// Custom Unmarshalers
 		{
 			name:          "custom_unmarshaler",
-			kind:          reflect.Ptr,
+			kind:          reflect.Pointer,
 			elemKind:      reflect.Struct,
 			value:         "test",
 			wantElemValue: CustomUnmarshaler{Value: "test"},
 		},
 		{
 			name:          "custom_unmarshaler_error",
-			kind:          reflect.Ptr,
+			kind:          reflect.Pointer,
 			elemKind:      reflect.Struct,
 			value:         "error",
 			wantElemValue: CustomUnmarshaler{Value: ""},
@@ -435,8 +435,8 @@ func TestSetFieldValue(t *testing.T) {
 				t.Errorf("error mismatch\ngot:  %v\nwant: %v", err, tt.wantErr)
 			}
 
-			if tt.kind == reflect.Ptr {
-				if field.Kind() != reflect.Ptr {
+			if tt.kind == reflect.Pointer {
+				if field.Kind() != reflect.Pointer {
 					t.Errorf("expected pointer, got %v", field.Kind())
 				}
 

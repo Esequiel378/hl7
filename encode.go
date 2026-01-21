@@ -79,7 +79,7 @@ func setFieldValue(field reflect.Value, value string) error {
 		}
 		field.SetBool(boolVal)
 
-	case reflect.Ptr:
+	case reflect.Pointer:
 		if field.IsNil() {
 			field.Set(reflect.New(field.Type().Elem()))
 		}

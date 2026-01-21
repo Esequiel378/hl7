@@ -281,3 +281,113 @@ func TestMSHCustomComponentSeparator(t *testing.T) {
 		})
 	}
 }
+
+func TestUnmarshalMultilineMessage(t *testing.T) {
+	type MessageType struct {
+		MessageCode  string `hl7:"1"`
+		TriggerEvent string `hl7:"2"`
+	}
+
+	type MSHSegment struct {
+		FieldSeparator       string      `hl7:"1"`
+		EncodingCharacters   string      `hl7:"2"`
+		SendingApplication   string      `hl7:"3"`
+		SendFacility         string      `hl7:"4"`
+		ReceivingApplication string      `hl7:"5"`
+		ReceivingFacility    string      `hl7:"6"`
+		DateTimeOfMessage    string      `hl7:"7"`
+		Security             string      `hl7:"8"`
+		MessageType          MessageType `hl7:"9"`
+		MessageControlID     string      `hl7:"10"`
+		ProcessingID         string      `hl7:"11"`
+		VersionID            string      `hl7:"12"`
+	}
+
+	type PatientName struct {
+		FamilyName string `hl7:"1"`
+		GivenName  string `hl7:"2"`
+		MiddleName string `hl7:"3"`
+	}
+
+	type PIDSegment struct {
+		SetID                 string      `hl7:"1"`
+		PatientIdentifierList string      `hl7:"3"`
+		PatientName           PatientName `hl7:"5"`
+		DateOfBirth           string      `hl7:"7"`
+		AdministrativeSex     string      `hl7:"8"`
+		Race                  string      `hl7:"10"`
+		Address               string      `hl7:"11"`
+		PhoneNumber           string      `hl7:"13"`
+		MaritalStatus         string      `hl7:"16"`
+		AccountNumber         string      `hl7:"18"`
+		SocialSecurityNumber  string      `hl7:"19"`
+	}
+
+	type PV1Segment struct {
+		SetID                   string `hl7:"1"`
+		PatientClass            string `hl7:"2"`
+		AssignedPatientLocation string `hl7:"3"`
+		AttendingDoctor         string `hl7:"7"`
+		HospitalService         string `hl7:"10"`
+		VisitNumber             string `hl7:"15"`
+		FinancialClass          string `hl7:"16"`
+	}
+
+	type Message struct {
+		MSH MSHSegment `hl7:"segment:MSH"`
+		PID PIDSegment `hl7:"segment:PID"`
+		PV1 PV1Segment `hl7:"segment:PV1"`
+	}
+
+	raw := `MSH|^~\&|HIS|RIH|EKG|EKG|200101011230||ADT^A01|MSG00001|P|2.3
+PID|1||123456^^^HOSP^MR||Doe^John^A||19700101|M||2106-3|123 Main St^^Metropolis^NY^10101||555-1234|||S||123456789|987-65-4321
+PV1|1|I|2000^2012^01||||1234^Jones^Bob|||SUR|||||1234567|A0|`
+
+	var got Message
+	if err := hl7.Unmarshal([]byte(raw), &got); err != nil {
+		t.Fatal(err)
+	}
+
+	expected := Message{
+		MSH: MSHSegment{
+			FieldSeparator:       "|",
+			EncodingCharacters:   "^~\\&",
+			SendingApplication:   "HIS",
+			SendFacility:         "RIH",
+			ReceivingApplication: "EKG",
+			ReceivingFacility:    "EKG",
+			DateTimeOfMessage:    "200101011230",
+			Security:             "",
+			MessageType:          MessageType{MessageCode: "ADT", TriggerEvent: "A01"},
+			MessageControlID:     "MSG00001",
+			ProcessingID:         "P",
+			VersionID:            "2.3",
+		},
+		PID: PIDSegment{
+			SetID:                 "1",
+			PatientIdentifierList: "123456^^^HOSP^MR",
+			PatientName:           PatientName{FamilyName: "Doe", GivenName: "John", MiddleName: "A"},
+			DateOfBirth:           "19700101",
+			AdministrativeSex:     "M",
+			Race:                  "2106-3",
+			Address:               "123 Main St^^Metropolis^NY^10101",
+			PhoneNumber:           "555-1234",
+			MaritalStatus:         "S",
+			AccountNumber:         "123456789",
+			SocialSecurityNumber:  "987-65-4321",
+		},
+		PV1: PV1Segment{
+			SetID:                   "1",
+			PatientClass:            "I",
+			AssignedPatientLocation: "2000^2012^01",
+			AttendingDoctor:         "1234^Jones^Bob",
+			HospitalService:         "SUR",
+			VisitNumber:             "1234567",
+			FinancialClass:          "A0",
+		},
+	}
+
+	if !reflect.DeepEqual(expected, got) {
+		t.Errorf("expected: %+v, got: %+v", expected, got)
+	}
+}

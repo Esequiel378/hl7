@@ -18,7 +18,7 @@ type Unmarshaler interface {
 	Unmarshal([]byte) error
 }
 
-var unmarshalerType = reflect.TypeOf((*Unmarshaler)(nil)).Elem()
+var unmarshalerType = reflect.TypeFor[Unmarshaler]()
 
 // implementsUnmarshaler checks if a field implements the Unmarshaler interface
 func implementsUnmarshaler(val reflect.Value) bool {
@@ -153,6 +153,12 @@ func setValuesByIndex(segment Segment, parent reflect.Value, fields []string, fs
 				return err
 			}
 
+			continue
+		}
+
+		// If the destination is a struct but we don't have component separators,
+		// skip assignment (treat as optional/empty) to avoid unsupported kind errors.
+		if parentField.Kind() == reflect.Struct {
 			continue
 		}
 
