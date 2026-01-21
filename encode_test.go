@@ -4,6 +4,7 @@ import (
 	"errors"
 	"reflect"
 	"testing"
+	"time"
 )
 
 var errError = errors.New("error")
@@ -456,5 +457,134 @@ func TestSetFieldValue(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestTimestamp(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   string
+		want    time.Time
+		wantErr bool
+	}{
+		{
+			name:  "full_with_timezone",
+			input: "20250205120000-0500",
+			want:  time.Date(2025, 2, 5, 12, 0, 0, 0, time.FixedZone("", -5*60*60)),
+		},
+		{
+			name:  "full_with_positive_timezone",
+			input: "20250205120000+0100",
+			want:  time.Date(2025, 2, 5, 12, 0, 0, 0, time.FixedZone("", 1*60*60)),
+		},
+		{
+			name:  "full_no_timezone",
+			input: "20250205120000",
+			want:  time.Date(2025, 2, 5, 12, 0, 0, 0, time.UTC),
+		},
+		{
+			name:  "minute_precision",
+			input: "202502051200",
+			want:  time.Date(2025, 2, 5, 12, 0, 0, 0, time.UTC),
+		},
+		{
+			name:  "hour_precision",
+			input: "2025020512",
+			want:  time.Date(2025, 2, 5, 12, 0, 0, 0, time.UTC),
+		},
+		{
+			name:  "date_only",
+			input: "20250205",
+			want:  time.Date(2025, 2, 5, 0, 0, 0, 0, time.UTC),
+		},
+		{
+			name:  "month_only",
+			input: "202502",
+			want:  time.Date(2025, 2, 1, 0, 0, 0, 0, time.UTC),
+		},
+		{
+			name:  "year_only",
+			input: "2025",
+			want:  time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC),
+		},
+		{
+			name:  "empty_string",
+			input: "",
+			want:  time.Time{},
+		},
+		{
+			name:    "invalid_format",
+			input:   "not-a-date",
+			wantErr: true,
+		},
+		{
+			name:    "partial_invalid",
+			input:   "202",
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var ts Timestamp
+			err := ts.Unmarshal([]byte(tt.input))
+
+			if tt.wantErr {
+				if err == nil {
+					t.Errorf("expected error, got nil")
+				}
+				return
+			}
+
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+				return
+			}
+
+			if !ts.Time.Equal(tt.want) {
+				t.Errorf("time mismatch\ngot:  %v\nwant: %v", ts.Time, tt.want)
+			}
+		})
+	}
+}
+
+func TestTimestampString(t *testing.T) {
+	tests := []struct {
+		name  string
+		input time.Time
+		want  string
+	}{
+		{
+			name:  "normal_time",
+			input: time.Date(2025, 2, 5, 12, 30, 45, 0, time.UTC),
+			want:  "20250205123045",
+		},
+		{
+			name:  "zero_time",
+			input: time.Time{},
+			want:  "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ts := Timestamp{Time: tt.input}
+			got := ts.String()
+			if got != tt.want {
+				t.Errorf("String() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestTimestampIsZero(t *testing.T) {
+	var ts Timestamp
+	if !ts.IsZero() {
+		t.Error("zero Timestamp should be IsZero()")
+	}
+
+	ts.Time = time.Now()
+	if ts.IsZero() {
+		t.Error("non-zero Timestamp should not be IsZero()")
 	}
 }

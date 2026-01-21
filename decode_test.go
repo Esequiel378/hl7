@@ -4,6 +4,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/esequiel378/hl7"
 )
@@ -314,7 +315,7 @@ func TestUnmarshalMultilineMessage(t *testing.T) {
 		PatientIdentifierList string      `hl7:"3"`
 		PatientName           PatientName `hl7:"5"`
 		DateOfBirth           string      `hl7:"7"`
-		AdministrativeSex     string      `hl7:"8"`
+		Gender                string      `hl7:"8"`
 		Race                  string      `hl7:"10"`
 		Address               string      `hl7:"11"`
 		PhoneNumber           string      `hl7:"13"`
@@ -368,7 +369,7 @@ PV1|1|I|2000^2012^01||||1234^Jones^Bob|||SUR|||||1234567|A0|`
 			PatientIdentifierList: "123456^^^HOSP^MR",
 			PatientName:           PatientName{FamilyName: "Doe", GivenName: "John", MiddleName: "A"},
 			DateOfBirth:           "19700101",
-			AdministrativeSex:     "M",
+			Gender:                "M",
 			Race:                  "2106-3",
 			Address:               "123 Main St^^Metropolis^NY^10101",
 			PhoneNumber:           "555-1234",
@@ -389,5 +390,105 @@ PV1|1|I|2000^2012^01||||1234^Jones^Bob|||SUR|||||1234567|A0|`
 
 	if !reflect.DeepEqual(expected, got) {
 		t.Errorf("expected: %+v, got: %+v", expected, got)
+	}
+}
+
+func TestUnmarshalWithRepetitions(t *testing.T) {
+	type PIDSegment struct {
+		SetID         string   `hl7:"1"`
+		PatientIDList []string `hl7:"3"` // Multiple IDs separated by ~
+	}
+
+	type Message struct {
+		PID PIDSegment `hl7:"segment:PID"`
+	}
+
+	raw := `MSH|^~\&|App|Fac|||20250205120000||ADT^A01|123|P|2.3
+PID|1||ID001~ID002~ID003`
+
+	var got Message
+	if err := hl7.Unmarshal([]byte(raw), &got); err != nil {
+		t.Fatalf("Unmarshal failed: %v", err)
+	}
+
+	if got.PID.SetID != "1" {
+		t.Errorf("SetID = %q, want %q", got.PID.SetID, "1")
+	}
+
+	expectedIDs := []string{"ID001", "ID002", "ID003"}
+	if !reflect.DeepEqual(got.PID.PatientIDList, expectedIDs) {
+		t.Errorf("PatientIDList = %v, want %v", got.PID.PatientIDList, expectedIDs)
+	}
+}
+
+func TestUnmarshalWithStructSliceRepetitions(t *testing.T) {
+	type PatientID struct {
+		ID         string `hl7:"1"`
+		CheckDigit string `hl7:"2"`
+		IDType     string `hl7:"5"`
+	}
+
+	type PIDSegment struct {
+		SetID         string      `hl7:"1"`
+		PatientIDList []PatientID `hl7:"3"` // Multiple structured IDs
+	}
+
+	type Message struct {
+		PID PIDSegment `hl7:"segment:PID"`
+	}
+
+	// PID-3 has 3 repetitions, each with components
+	raw := `MSH|^~\&|App|Fac|||20250205120000||ADT^A01|123|P|2.3
+PID|1||12345^1^^HOSP^MR~67890^2^^LAB^LN~99999^3^^INS^PI`
+
+	var got Message
+	if err := hl7.Unmarshal([]byte(raw), &got); err != nil {
+		t.Fatalf("Unmarshal failed: %v", err)
+	}
+
+	if len(got.PID.PatientIDList) != 3 {
+		t.Fatalf("PatientIDList len = %d, want 3", len(got.PID.PatientIDList))
+	}
+
+	expected := []PatientID{
+		{ID: "12345", CheckDigit: "1", IDType: "MR"},
+		{ID: "67890", CheckDigit: "2", IDType: "LN"},
+		{ID: "99999", CheckDigit: "3", IDType: "PI"},
+	}
+
+	if !reflect.DeepEqual(got.PID.PatientIDList, expected) {
+		t.Errorf("PatientIDList mismatch\ngot:  %+v\nwant: %+v", got.PID.PatientIDList, expected)
+	}
+}
+
+func TestUnmarshalWithTimestamp(t *testing.T) {
+	type PIDSegment struct {
+		SetID       string        `hl7:"1"`
+		PatientID   string        `hl7:"3"`
+		DateOfBirth hl7.Timestamp `hl7:"7"`
+	}
+
+	type Message struct {
+		PID PIDSegment `hl7:"segment:PID"`
+	}
+
+	raw := `PID|1||12345||||19850315120000`
+
+	var got Message
+	if err := hl7.Unmarshal([]byte(raw), &got); err != nil {
+		t.Fatalf("Unmarshal failed: %v", err)
+	}
+
+	expectedDOB := time.Date(1985, 3, 15, 12, 0, 0, 0, time.UTC)
+	if !got.PID.DateOfBirth.Time.Equal(expectedDOB) {
+		t.Errorf("DateOfBirth mismatch\ngot:  %v\nwant: %v", got.PID.DateOfBirth.Time, expectedDOB)
+	}
+
+	if got.PID.SetID != "1" {
+		t.Errorf("SetID = %q, want %q", got.PID.SetID, "1")
+	}
+
+	if got.PID.PatientID != "12345" {
+		t.Errorf("PatientID = %q, want %q", got.PID.PatientID, "12345")
 	}
 }

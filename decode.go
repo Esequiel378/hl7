@@ -82,7 +82,7 @@ func Unmarshal(data []byte, v any) error {
 		line := scanner.Text()
 
 		// Extract the field separator from the MSH segment if present
-		if strings.HasPrefix(line, "MSH") {
+		if strings.HasPrefix(line, "MSH") && len(line) > 3 {
 			fieldSeparator = string(line[3])
 		}
 
@@ -91,7 +91,7 @@ func Unmarshal(data []byte, v any) error {
 			continue
 		}
 
-		if strings.HasPrefix(parts[0], "MSH") {
+		if strings.HasPrefix(parts[0], "MSH") && len(parts) > 1 {
 			encodingCharacters = parts[1]
 		}
 
@@ -111,6 +111,10 @@ func Unmarshal(data []byte, v any) error {
 		}
 	}
 
+	if err := scanner.Err(); err != nil {
+		return fmt.Errorf("hl7: failed to read message: %w", err)
+	}
+
 	return nil
 }
 
@@ -118,7 +122,14 @@ var ErrFieldIndexOutOfBounds = errors.New("hl7: field index out of bounds")
 
 // setValuesByIndex maps HL7 field values to struct fields using the hl7 tags.
 func setValuesByIndex(segment Segment, parent reflect.Value, fields []string, fs, ec string, level uint) error {
-	componentSeparator := string(ec[0])
+	componentSeparator := "^" // Default component separator
+	if len(ec) > 0 {
+		componentSeparator = string(ec[0])
+	}
+	repetitionSeparator := ""
+	if len(ec) > 1 {
+		repetitionSeparator = string(ec[1])
+	}
 
 	for i := 0; i < parent.NumField(); i++ {
 		parentField := parent.Field(i)
@@ -127,8 +138,16 @@ func setValuesByIndex(segment Segment, parent reflect.Value, fields []string, fs
 			return err
 		}
 
-		// HL7 is 1-based, so we need to decrement the index
-		sIndex = sIndex - 1
+		// HL7 field indexing:
+		// - For MSH at level 0: MSH-1 is the field separator (not in parts array),
+		//   so MSH-N maps to parts[N-1]
+		// - For other segments at level 0: parts[0] is the segment name,
+		//   so FIELD-N maps to parts[N]
+		// - For components (level > 0): components are 1-based,
+		//   so component N maps to parts[N-1]
+		if segment == "MSH" || level > 0 {
+			sIndex = sIndex - 1
+		}
 
 		// If the field index is out of bounds or invalid, skip assignment (treat as optional)
 		if sIndex >= len(fields) || sIndex < 0 {
@@ -141,10 +160,43 @@ func setValuesByIndex(segment Segment, parent reflect.Value, fields []string, fs
 			sField = fs
 		}
 
+		// Handle repetitions (~) for slice fields
+		if parentField.Kind() == reflect.Slice && repetitionSeparator != "" {
+			repetitions := strings.Split(sField, repetitionSeparator)
+			sliceType := parentField.Type()
+			elemType := sliceType.Elem()
+			newSlice := reflect.MakeSlice(sliceType, len(repetitions), len(repetitions))
+
+			for ri, rep := range repetitions {
+				elem := newSlice.Index(ri)
+
+				// If element is a struct, parse components recursively
+				if elemType.Kind() == reflect.Struct {
+					repComponents := strings.Split(rep, componentSeparator)
+					if len(repComponents) > 1 {
+						if err := setValuesByIndex(segment, elem, repComponents, fs, ec, level+1); err != nil {
+							return err
+						}
+						continue
+					}
+				}
+
+				if err := setFieldValue(elem, rep); err != nil {
+					return &FieldError{
+						Segment: string(segment),
+						Field:   sIndex + 1,
+						Value:   rep,
+						Err:     err,
+					}
+				}
+			}
+			parentField.Set(newSlice)
+			continue
+		}
+
 		components := strings.Split(sField, componentSeparator)
 
 		// TODO: Add support for subcomponent separator
-		// TODO: Add support for repetition separator
 		shouldParseComponents := len(components) > 1 && parentField.Kind() == reflect.Struct
 
 		// Handle components recursively
@@ -157,14 +209,20 @@ func setValuesByIndex(segment Segment, parent reflect.Value, fields []string, fs
 		}
 
 		// If the destination is a struct but we don't have component separators,
-		// skip assignment (treat as optional/empty) to avoid unsupported kind errors.
-		if parentField.Kind() == reflect.Struct {
+		// check if it implements Unmarshaler (like Timestamp). If not, skip assignment
+		// (treat as optional/empty) to avoid unsupported kind errors.
+		if parentField.Kind() == reflect.Struct && !implementsUnmarshaler(parentField) {
 			continue
 		}
 
 		// Set field value based on its type
 		if err := setFieldValue(parentField, sField); err != nil {
-			return err
+			return &FieldError{
+				Segment: string(segment),
+				Field:   sIndex + 1, // Convert back to 1-based for user-facing error
+				Value:   sField,
+				Err:     err,
+			}
 		}
 	}
 
