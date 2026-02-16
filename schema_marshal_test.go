@@ -13,12 +13,12 @@ func TestMarshalWithSchemaBasicMSH(t *testing.T) {
 		"segments": {
 			"MSH": {
 				"fields": {
-					"1": { "name": "fieldSeparator", "type": "string" },
-					"2": { "name": "encodingCharacters", "type": "string" },
-					"3": { "name": "sendingApplication", "type": "string" },
-					"4": { "name": "sendingFacility", "type": "string" },
-					"10": { "name": "messageControlID", "type": "string" },
-					"12": { "name": "versionID", "type": "string" }
+					"fieldSeparator":     { "index": 1 },
+					"encodingCharacters": { "index": 2 },
+					"sendingApplication": { "index": 3 },
+					"sendingFacility":    { "index": 4 },
+					"messageControlID":   { "index": 10 },
+					"versionID":          { "index": 12 }
 				}
 			}
 		}
@@ -57,14 +57,14 @@ func TestMarshalWithSchemaComponents(t *testing.T) {
 		"segments": {
 			"MSH": {
 				"fields": {
-					"1": { "name": "fieldSeparator", "type": "string" },
-					"2": { "name": "encodingCharacters", "type": "string" },
-					"3": { "name": "sendingApplication", "type": "string" },
-					"9": {
-						"name": "messageType", "type": "object",
+					"fieldSeparator":     { "index": 1 },
+					"encodingCharacters": { "index": 2 },
+					"sendingApplication": { "index": 3 },
+					"messageType": {
+						"index": 9, "type": "object",
 						"components": {
-							"1": { "name": "code", "type": "string" },
-							"2": { "name": "trigger", "type": "string" }
+							"code":    { "index": 1 },
+							"trigger": { "index": 2 }
 						}
 					}
 				}
@@ -100,10 +100,10 @@ func TestMarshalWithSchemaArray(t *testing.T) {
 		"segments": {
 			"PID": {
 				"fields": {
-					"1": { "name": "setID", "type": "string" },
-					"3": {
-						"name": "patientIDList", "type": "array",
-						"items": { "name": "id", "type": "string" }
+					"setID": { "index": 1 },
+					"patientIDList": {
+						"index": 3, "type": "array",
+						"items": { "type": "string" }
 					}
 				}
 			}
@@ -133,13 +133,13 @@ func TestMarshalWithSchemaArrayOfObjects(t *testing.T) {
 		"segments": {
 			"PID": {
 				"fields": {
-					"3": {
-						"name": "patientIDList", "type": "array",
+					"patientIDList": {
+						"index": 3, "type": "array",
 						"items": {
-							"name": "patientID", "type": "object",
+							"type": "object",
 							"components": {
-								"1": { "name": "id", "type": "string" },
-								"5": { "name": "type", "type": "string" }
+								"id":   { "index": 1 },
+								"type": { "index": 5 }
 							}
 						}
 					}
@@ -173,15 +173,15 @@ func TestMarshalWithSchemaMultipleSegments(t *testing.T) {
 		"segments": {
 			"MSH": {
 				"fields": {
-					"1": { "name": "fieldSeparator", "type": "string" },
-					"2": { "name": "encodingCharacters", "type": "string" },
-					"3": { "name": "sendingApplication", "type": "string" }
+					"fieldSeparator":     { "index": 1 },
+					"encodingCharacters": { "index": 2 },
+					"sendingApplication": { "index": 3 }
 				}
 			},
 			"PID": {
 				"fields": {
-					"1": { "name": "setID", "type": "string" },
-					"3": { "name": "patientID", "type": "string" }
+					"setID":     { "index": 1 },
+					"patientID": { "index": 3 }
 				}
 			}
 		}
@@ -218,9 +218,9 @@ func TestMarshalWithSchemaTypedValues(t *testing.T) {
 		"segments": {
 			"OBX": {
 				"fields": {
-					"1": { "name": "setID", "type": "int" },
-					"5": { "name": "value", "type": "float" },
-					"11": { "name": "active", "type": "bool" }
+					"setID":  { "index": 1, "type": "int" },
+					"value":  { "index": 5, "type": "float" },
+					"active": { "index": 11, "type": "bool" }
 				}
 			}
 		}
@@ -256,7 +256,7 @@ func TestMarshalWithSchemaTimestamp(t *testing.T) {
 		"segments": {
 			"PID": {
 				"fields": {
-					"7": { "name": "dateOfBirth", "type": "timestamp" }
+					"dateOfBirth": { "index": 7, "type": "timestamp" }
 				}
 			}
 		}
@@ -284,9 +284,9 @@ func TestMarshalWithSchemaOptions(t *testing.T) {
 		"segments": {
 			"MSH": {
 				"fields": {
-					"1": { "name": "fieldSeparator", "type": "string" },
-					"2": { "name": "encodingCharacters", "type": "string" },
-					"3": { "name": "sendingApplication", "type": "string" }
+					"fieldSeparator":     { "index": 1 },
+					"encodingCharacters": { "index": 2 },
+					"sendingApplication": { "index": 3 }
 				}
 			}
 		}
@@ -325,27 +325,27 @@ func TestSchemaRoundTrip(t *testing.T) {
 		"segments": {
 			"MSH": {
 				"fields": {
-					"1": { "name": "fieldSeparator", "type": "string" },
-					"2": { "name": "encodingCharacters", "type": "string" },
-					"3": { "name": "sendingApplication", "type": "string" },
-					"4": { "name": "sendingFacility", "type": "string" },
-					"9": {
-						"name": "messageType", "type": "object",
+					"fieldSeparator":     { "index": 1 },
+					"encodingCharacters": { "index": 2 },
+					"sendingApplication": { "index": 3 },
+					"sendingFacility":    { "index": 4 },
+					"messageType": {
+						"index": 9, "type": "object",
 						"components": {
-							"1": { "name": "code", "type": "string" },
-							"2": { "name": "trigger", "type": "string" }
+							"code":    { "index": 1 },
+							"trigger": { "index": 2 }
 						}
 					},
-					"10": { "name": "messageControlID", "type": "string" },
-					"11": { "name": "processingID", "type": "string" },
-					"12": { "name": "versionID", "type": "string" }
+					"messageControlID": { "index": 10 },
+					"processingID":     { "index": 11 },
+					"versionID":        { "index": 12 }
 				}
 			},
 			"PID": {
 				"fields": {
-					"1": { "name": "setID", "type": "string" },
-					"3": { "name": "patientID", "type": "string" },
-					"8": { "name": "gender", "type": "string" }
+					"setID":     { "index": 1 },
+					"patientID": { "index": 3 },
+					"gender":    { "index": 8 }
 				}
 			}
 		}
@@ -410,5 +410,62 @@ func TestSchemaRoundTrip(t *testing.T) {
 	}
 	if pid1["gender"] != pid2["gender"] {
 		t.Errorf("gender mismatch: %v vs %v", pid1["gender"], pid2["gender"])
+	}
+}
+
+func TestMarshalWithSchemaRepeatSegments(t *testing.T) {
+	schema := mustParseSchema(t, `{
+		"segments": {
+			"MSH": {
+				"fields": {
+					"fieldSeparator":     { "index": 1 },
+					"encodingCharacters": { "index": 2 },
+					"sendingApplication": { "index": 3 }
+				}
+			},
+			"OBX": {
+				"repeat": true,
+				"fields": {
+					"setID":            { "index": 1, "type": "int" },
+					"valueType":        { "index": 2 },
+					"observationValue": { "index": 5 }
+				}
+			}
+		}
+	}`)
+
+	data := map[string]any{
+		"MSH": map[string]any{
+			"fieldSeparator":     "|",
+			"encodingCharacters": "^~\\&",
+			"sendingApplication": "App1",
+		},
+		"OBX": []any{
+			map[string]any{
+				"setID":            int64(1),
+				"valueType":        "NM",
+				"observationValue": "98.6",
+			},
+			map[string]any{
+				"setID":            int64(2),
+				"valueType":        "ST",
+				"observationValue": "Normal",
+			},
+		},
+	}
+
+	opts := hl7.DefaultMarshalOptions()
+	opts.LineEnding = "\n"
+	result, err := hl7.MarshalWithSchemaOptions(data, schema, opts)
+	if err != nil {
+		t.Fatalf("MarshalWithSchemaOptions failed: %v", err)
+	}
+
+	str := string(result)
+	if !strings.Contains(str, "OBX|1|NM|||98.6") {
+		t.Errorf("expected OBX|1|NM|||98.6, got: %s", str)
+	}
+	if !strings.Contains(str, "OBX|2|ST|||Normal") {
+		t.Errorf("expected OBX|2|ST|||Normal, got: %s", str)
 	}
 }

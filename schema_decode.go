@@ -27,7 +27,19 @@ func UnmarshalWithSchema(data []byte, schema *MessageSchema) (map[string]any, er
 			return nil, err
 		}
 
-		if len(segMap) > 0 {
+		if len(segMap) == 0 {
+			continue
+		}
+
+		if segSchema.Repeat {
+			existing, ok := result[string(seg.name)]
+			if ok {
+				arr := existing.([]any)
+				result[string(seg.name)] = append(arr, segMap)
+			} else {
+				result[string(seg.name)] = []any{segMap}
+			}
+		} else {
 			result[string(seg.name)] = segMap
 		}
 	}
@@ -47,14 +59,8 @@ func decodeSegmentWithSchema(seg segmentLine, schema *SegmentSchema) (map[string
 
 	result := make(map[string]any)
 
-	for fieldIdx, fieldSchema := range schema.Fields {
-		idx, err := strconv.Atoi(fieldIdx)
-		if err != nil {
-			return nil, &SchemaError{
-				Path: fmt.Sprintf("segments.%s.fields.%s", seg.name, fieldIdx),
-				Err:  fmt.Errorf("invalid field index: %w", err),
-			}
-		}
+	for fieldName, fieldSchema := range schema.Fields {
+		idx := fieldSchema.Index
 
 		// HL7 field indexing: MSH-1 is the field separator (maps to parts[0] offset),
 		// other segments have parts[0] as segment name.
@@ -84,7 +90,7 @@ func decodeSegmentWithSchema(seg segmentLine, schema *SegmentSchema) (map[string
 		}
 
 		if val != nil {
-			result[fieldSchema.Name] = val
+			result[fieldName] = val
 		}
 	}
 
@@ -139,14 +145,8 @@ func decodeObjectField(segName string, fieldIdx int, raw string, schema *FieldSc
 	components := strings.Split(raw, cs)
 	result := make(map[string]any)
 
-	for compIdx, compSchema := range schema.Components {
-		idx, err := strconv.Atoi(compIdx)
-		if err != nil {
-			return nil, &SchemaError{
-				Path: fmt.Sprintf("segments.%s.fields.%d.components.%s", segName, fieldIdx, compIdx),
-				Err:  fmt.Errorf("invalid component index: %w", err),
-			}
-		}
+	for compName, compSchema := range schema.Components {
+		idx := compSchema.Index
 
 		// Components are 1-based
 		arrIdx := idx - 1
@@ -164,7 +164,7 @@ func decodeObjectField(segName string, fieldIdx int, raw string, schema *FieldSc
 			return nil, err
 		}
 
-		result[compSchema.Name] = val
+		result[compName] = val
 	}
 
 	if len(result) == 0 {
@@ -233,4 +233,3 @@ func coerceValue(segName string, fieldIdx, compIdx int, raw string, typ SchemaTy
 		return raw, nil
 	}
 }
-

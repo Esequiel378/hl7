@@ -22,12 +22,12 @@ func TestUnmarshalWithSchemaBasicMSH(t *testing.T) {
 		"segments": {
 			"MSH": {
 				"fields": {
-					"1": { "name": "fieldSeparator", "type": "string" },
-					"2": { "name": "encodingCharacters", "type": "string" },
-					"3": { "name": "sendingApplication", "type": "string" },
-					"4": { "name": "sendingFacility", "type": "string" },
-					"10": { "name": "messageControlID", "type": "string" },
-					"12": { "name": "versionID", "type": "string" }
+					"fieldSeparator":     { "index": 1 },
+					"encodingCharacters": { "index": 2 },
+					"sendingApplication": { "index": 3 },
+					"sendingFacility":    { "index": 4 },
+					"messageControlID":   { "index": 10 },
+					"versionID":          { "index": 12 }
 				}
 			}
 		}
@@ -70,12 +70,12 @@ func TestUnmarshalWithSchemaComponents(t *testing.T) {
 		"segments": {
 			"MSH": {
 				"fields": {
-					"1": { "name": "fieldSeparator", "type": "string" },
-					"9": {
-						"name": "messageType", "type": "object",
+					"fieldSeparator": { "index": 1 },
+					"messageType": {
+						"index": 9, "type": "object",
 						"components": {
-							"1": { "name": "code", "type": "string" },
-							"2": { "name": "trigger", "type": "string" }
+							"code":    { "index": 1 },
+							"trigger": { "index": 2 }
 						}
 					}
 				}
@@ -106,14 +106,14 @@ func TestUnmarshalWithSchemaArrayOfStrings(t *testing.T) {
 		"segments": {
 			"MSH": {
 				"fields": {
-					"1": { "name": "fieldSeparator", "type": "string" }
+					"fieldSeparator": { "index": 1 }
 				}
 			},
 			"PID": {
 				"fields": {
-					"3": {
-						"name": "patientIDList", "type": "array",
-						"items": { "name": "id", "type": "string" }
+					"patientIDList": {
+						"index": 3, "type": "array",
+						"items": { "type": "string" }
 					}
 				}
 			}
@@ -141,18 +141,18 @@ func TestUnmarshalWithSchemaArrayOfObjects(t *testing.T) {
 		"segments": {
 			"MSH": {
 				"fields": {
-					"1": { "name": "fieldSeparator", "type": "string" }
+					"fieldSeparator": { "index": 1 }
 				}
 			},
 			"PID": {
 				"fields": {
-					"3": {
-						"name": "patientIDList", "type": "array",
+					"patientIDList": {
+						"index": 3, "type": "array",
 						"items": {
-							"name": "patientID", "type": "object",
+							"type": "object",
 							"components": {
-								"1": { "name": "id", "type": "string" },
-								"5": { "name": "type", "type": "string" }
+								"id":   { "index": 1 },
+								"type": { "index": 5 }
 							}
 						}
 					}
@@ -197,28 +197,28 @@ func TestUnmarshalWithSchemaMultiSegment(t *testing.T) {
 		"segments": {
 			"MSH": {
 				"fields": {
-					"1": { "name": "fieldSeparator", "type": "string" },
-					"3": { "name": "sendingApplication", "type": "string" },
-					"9": {
-						"name": "messageType", "type": "object",
+					"fieldSeparator":    { "index": 1 },
+					"sendingApplication": { "index": 3 },
+					"messageType": {
+						"index": 9, "type": "object",
 						"components": {
-							"1": { "name": "code", "type": "string" },
-							"2": { "name": "trigger", "type": "string" }
+							"code":    { "index": 1 },
+							"trigger": { "index": 2 }
 						}
 					}
 				}
 			},
 			"PID": {
 				"fields": {
-					"1": { "name": "setID", "type": "string" },
-					"3": { "name": "patientID", "type": "string" },
-					"8": { "name": "gender", "type": "string" }
+					"setID":     { "index": 1 },
+					"patientID": { "index": 3 },
+					"gender":    { "index": 8 }
 				}
 			},
 			"PV1": {
 				"fields": {
-					"2": { "name": "patientClass", "type": "string" },
-					"10": { "name": "hospitalService", "type": "string" }
+					"patientClass":    { "index": 2 },
+					"hospitalService": { "index": 10 }
 				}
 			}
 		}
@@ -267,9 +267,9 @@ func TestUnmarshalWithSchemaTypeCoercion(t *testing.T) {
 		"segments": {
 			"OBX": {
 				"fields": {
-					"1": { "name": "setID", "type": "int" },
-					"5": { "name": "value", "type": "float" },
-					"11": { "name": "active", "type": "bool" }
+					"setID":  { "index": 1, "type": "int" },
+					"value":  { "index": 5, "type": "float" },
+					"active": { "index": 11, "type": "bool" }
 				}
 			}
 		}
@@ -300,7 +300,7 @@ func TestUnmarshalWithSchemaTimestamp(t *testing.T) {
 		"segments": {
 			"PID": {
 				"fields": {
-					"7": { "name": "dateOfBirth", "type": "timestamp" }
+					"dateOfBirth": { "index": 7, "type": "timestamp" }
 				}
 			}
 		}
@@ -327,7 +327,7 @@ func TestUnmarshalWithSchemaCoercionError(t *testing.T) {
 		"segments": {
 			"OBX": {
 				"fields": {
-					"1": { "name": "setID", "type": "int" }
+					"setID": { "index": 1, "type": "int" }
 				}
 			}
 		}
@@ -346,7 +346,7 @@ func TestUnmarshalWithSchemaUnknownSegmentIgnored(t *testing.T) {
 		"segments": {
 			"MSH": {
 				"fields": {
-					"1": { "name": "fieldSeparator", "type": "string" }
+					"fieldSeparator": { "index": 1 }
 				}
 			}
 		}
@@ -369,8 +369,8 @@ func TestUnmarshalWithSchemaMissingFieldsOmitted(t *testing.T) {
 		"segments": {
 			"PID": {
 				"fields": {
-					"1": { "name": "setID", "type": "string" },
-					"50": { "name": "customField", "type": "string" }
+					"setID":       { "index": 1 },
+					"customField": { "index": 50 }
 				}
 			}
 		}
@@ -397,13 +397,13 @@ func TestUnmarshalWithSchemaCustomSeparators(t *testing.T) {
 		"segments": {
 			"MSH": {
 				"fields": {
-					"1": { "name": "fieldSeparator", "type": "string" },
-					"3": { "name": "sendingApplication", "type": "string" },
-					"9": {
-						"name": "messageType", "type": "object",
+					"fieldSeparator":     { "index": 1 },
+					"sendingApplication": { "index": 3 },
+					"messageType": {
+						"index": 9, "type": "object",
 						"components": {
-							"1": { "name": "code", "type": "string" },
-							"2": { "name": "trigger", "type": "string" }
+							"code":    { "index": 1 },
+							"trigger": { "index": 2 }
 						}
 					}
 				}
@@ -440,10 +440,10 @@ func TestUnmarshalWithSchemaBoolVariants(t *testing.T) {
 		"segments": {
 			"OBX": {
 				"fields": {
-					"1": { "name": "f1", "type": "bool" },
-					"2": { "name": "f2", "type": "bool" },
-					"3": { "name": "f3", "type": "bool" },
-					"4": { "name": "f4", "type": "bool" }
+					"f1": { "index": 1, "type": "bool" },
+					"f2": { "index": 2, "type": "bool" },
+					"f3": { "index": 3, "type": "bool" },
+					"f4": { "index": 4, "type": "bool" }
 				}
 			}
 		}
@@ -468,5 +468,57 @@ func TestUnmarshalWithSchemaBoolVariants(t *testing.T) {
 	}
 	if obx["f4"] != false {
 		t.Errorf("f4 = %v, want false", obx["f4"])
+	}
+}
+
+func TestUnmarshalWithSchemaRepeatSegments(t *testing.T) {
+	schema := mustParseSchema(t, `{
+		"segments": {
+			"MSH": {
+				"fields": {
+					"fieldSeparator": { "index": 1 }
+				}
+			},
+			"OBX": {
+				"repeat": true,
+				"fields": {
+					"setID":      { "index": 1, "type": "int" },
+					"valueType":  { "index": 2 },
+					"observationValue": { "index": 5 }
+				}
+			}
+		}
+	}`)
+
+	raw := []byte("MSH|^~\\&|App|Fac|||20250205120000||ORU^R01|123|P|2.3\nOBX|1|NM|||98.6\nOBX|2|ST|||Normal")
+
+	result, err := hl7.UnmarshalWithSchema(raw, schema)
+	if err != nil {
+		t.Fatalf("UnmarshalWithSchema failed: %v", err)
+	}
+
+	obxList, ok := result["OBX"].([]any)
+	if !ok {
+		t.Fatalf("expected OBX to be []any, got %T", result["OBX"])
+	}
+
+	if len(obxList) != 2 {
+		t.Fatalf("expected 2 OBX segments, got %d", len(obxList))
+	}
+
+	obx1 := obxList[0].(map[string]any)
+	if obx1["setID"] != int64(1) {
+		t.Errorf("OBX[0].setID = %v, want 1", obx1["setID"])
+	}
+	if obx1["observationValue"] != "98.6" {
+		t.Errorf("OBX[0].observationValue = %v, want 98.6", obx1["observationValue"])
+	}
+
+	obx2 := obxList[1].(map[string]any)
+	if obx2["setID"] != int64(2) {
+		t.Errorf("OBX[1].setID = %v, want 2", obx2["setID"])
+	}
+	if obx2["observationValue"] != "Normal" {
+		t.Errorf("OBX[1].observationValue = %v, want Normal", obx2["observationValue"])
 	}
 }

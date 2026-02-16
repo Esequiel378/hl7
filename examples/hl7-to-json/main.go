@@ -20,49 +20,49 @@ func main() {
 		"segments": {
 			"MSH": {
 				"fields": {
-					"1":  { "name": "fieldSeparator",      "type": "string" },
-					"2":  { "name": "encodingCharacters",   "type": "string" },
-					"3":  { "name": "sendingApplication",   "type": "string" },
-					"4":  { "name": "sendingFacility",      "type": "string" },
-					"5":  { "name": "receivingApplication",  "type": "string" },
-					"6":  { "name": "receivingFacility",    "type": "string" },
-					"7":  { "name": "dateTimeOfMessage",    "type": "string" },
-					"9":  {
-						"name": "messageType", "type": "object",
+					"fieldSeparator":       { "index": 1 },
+					"encodingCharacters":   { "index": 2 },
+					"sendingApplication":   { "index": 3 },
+					"sendingFacility":      { "index": 4 },
+					"receivingApplication": { "index": 5 },
+					"receivingFacility":    { "index": 6 },
+					"dateTimeOfMessage":    { "index": 7 },
+					"messageType": {
+						"index": 9, "type": "object",
 						"components": {
-							"1": { "name": "code",    "type": "string" },
-							"2": { "name": "trigger", "type": "string" }
+							"code":    { "index": 1 },
+							"trigger": { "index": 2 }
 						}
 					},
-					"10": { "name": "messageControlID", "type": "string" },
-					"11": { "name": "processingID",     "type": "string" },
-					"12": { "name": "versionID",        "type": "string" }
+					"messageControlID": { "index": 10 },
+					"processingID":     { "index": 11 },
+					"versionID":        { "index": 12 }
 				}
 			},
 			"PID": {
 				"fields": {
-					"1": { "name": "setID",     "type": "string" },
-					"3": { "name": "patientID", "type": "string" },
-					"5": {
-						"name": "patientName", "type": "object",
+					"setID":     { "index": 1 },
+					"patientID": { "index": 3 },
+					"patientName": {
+						"index": 5, "type": "object",
 						"components": {
-							"1": { "name": "familyName", "type": "string" },
-							"2": { "name": "givenName",  "type": "string" },
-							"3": { "name": "middleName", "type": "string" }
+							"familyName": { "index": 1 },
+							"givenName":  { "index": 2 },
+							"middleName": { "index": 3 }
 						}
 					},
-					"7":  { "name": "dateOfBirth", "type": "string" },
-					"8":  { "name": "gender",      "type": "string" },
-					"11": { "name": "address",     "type": "string" },
-					"13": { "name": "phoneNumber", "type": "string" }
+					"dateOfBirth": { "index": 7 },
+					"gender":      { "index": 8 },
+					"address":     { "index": 11 },
+					"phoneNumber": { "index": 13 }
 				}
 			},
 			"PV1": {
 				"fields": {
-					"1":  { "name": "setID",                   "type": "string" },
-					"2":  { "name": "patientClass",            "type": "string" },
-					"3":  { "name": "assignedPatientLocation", "type": "string" },
-					"10": { "name": "hospitalService",         "type": "string" }
+					"setID":                   { "index": 1 },
+					"patientClass":            { "index": 2 },
+					"assignedPatientLocation": { "index": 3 },
+					"hospitalService":         { "index": 10 }
 				}
 			}
 		}

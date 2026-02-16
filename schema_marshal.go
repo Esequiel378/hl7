@@ -51,23 +51,45 @@ func MarshalWithSchemaOptions(v map[string]any, schema *MessageSchema, opts Mars
 			continue
 		}
 
-		segMap, ok := segData.(map[string]any)
-		if !ok {
-			continue
-		}
-
 		segSchema := schema.Segments[segName]
 
-		line, err := marshalSegmentFromMap(segName, segMap, segSchema, fs, cs, rs, ec, opts)
-		if err != nil {
-			return nil, err
-		}
+		if segSchema.Repeat {
+			arr, ok := segData.([]any)
+			if !ok {
+				continue
+			}
+			for _, item := range arr {
+				segMap, ok := item.(map[string]any)
+				if !ok {
+					continue
+				}
+				line, err := marshalSegmentFromMap(segName, segMap, segSchema, fs, cs, rs, ec, opts)
+				if err != nil {
+					return nil, err
+				}
+				if !first {
+					buf.WriteString(opts.LineEnding)
+				}
+				buf.Write(line)
+				first = false
+			}
+		} else {
+			segMap, ok := segData.(map[string]any)
+			if !ok {
+				continue
+			}
 
-		if !first {
-			buf.WriteString(opts.LineEnding)
+			line, err := marshalSegmentFromMap(segName, segMap, segSchema, fs, cs, rs, ec, opts)
+			if err != nil {
+				return nil, err
+			}
+
+			if !first {
+				buf.WriteString(opts.LineEnding)
+			}
+			buf.Write(line)
+			first = false
 		}
-		buf.Write(line)
-		first = false
 	}
 
 	return buf.Bytes(), nil
@@ -76,14 +98,16 @@ func MarshalWithSchemaOptions(v map[string]any, schema *MessageSchema, opts Mars
 func marshalSegmentFromMap(name string, data map[string]any, schema *SegmentSchema, fs, cs, rs, ec string, opts MarshalOptions) ([]byte, error) {
 	// Find max field index
 	maxIdx := 0
-	for idxStr := range schema.Fields {
-		idx, err := strconv.Atoi(idxStr)
-		if err != nil {
-			continue
+	for _, fieldSchema := range schema.Fields {
+		if fieldSchema.Index > maxIdx {
+			maxIdx = fieldSchema.Index
 		}
-		if idx > maxIdx {
-			maxIdx = idx
-		}
+	}
+
+	// Build index-to-name lookup
+	indexToName := make(map[int]string, len(schema.Fields))
+	for fieldName, fieldSchema := range schema.Fields {
+		indexToName[fieldSchema.Index] = fieldName
 	}
 
 	isMSH := name == "MSH"
@@ -109,13 +133,13 @@ func marshalSegmentFromMap(name string, data map[string]any, schema *SegmentSche
 			continue
 		}
 
-		idxStr := strconv.Itoa(idx)
-		fieldSchema, ok := schema.Fields[idxStr]
+		fieldName, ok := indexToName[idx]
 		if !ok {
 			continue
 		}
+		fieldSchema := schema.Fields[fieldName]
 
-		val, ok := data[fieldSchema.Name]
+		val, ok := data[fieldName]
 		if !ok {
 			continue
 		}
@@ -153,23 +177,21 @@ func marshalObjectFromMap(val any, schema *FieldSchema, cs string) (string, erro
 
 	// Find max component index
 	maxIdx := 0
-	for idxStr := range schema.Components {
-		idx, err := strconv.Atoi(idxStr)
-		if err != nil {
-			continue
-		}
-		if idx > maxIdx {
-			maxIdx = idx
+	for _, compSchema := range schema.Components {
+		if compSchema.Index > maxIdx {
+			maxIdx = compSchema.Index
 		}
 	}
 
+	// Build index-to-name lookup
+	indexToName := make(map[int]string, len(schema.Components))
+	for compName, compSchema := range schema.Components {
+		indexToName[compSchema.Index] = compName
+	}
+
 	parts := make([]string, maxIdx)
-	for idxStr, compSchema := range schema.Components {
-		idx, err := strconv.Atoi(idxStr)
-		if err != nil {
-			continue
-		}
-		compVal, ok := m[compSchema.Name]
+	for compName, compSchema := range schema.Components {
+		compVal, ok := m[compName]
 		if !ok {
 			continue
 		}
@@ -177,7 +199,7 @@ func marshalObjectFromMap(val any, schema *FieldSchema, cs string) (string, erro
 		if err != nil {
 			return "", err
 		}
-		parts[idx-1] = str
+		parts[compSchema.Index-1] = str
 	}
 
 	// Trim trailing empty parts

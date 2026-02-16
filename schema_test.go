@@ -13,12 +13,12 @@ func TestParseSchemaValid(t *testing.T) {
 		"segments": {
 			"MSH": {
 				"fields": {
-					"1": { "name": "fieldSeparator", "type": "string" },
-					"9": {
-						"name": "messageType", "type": "object",
+					"fieldSeparator": { "index": 1 },
+					"messageType": {
+						"index": 9, "type": "object",
 						"components": {
-							"1": { "name": "code", "type": "string" },
-							"2": { "name": "trigger", "type": "string" }
+							"code": { "index": 1 },
+							"trigger": { "index": 2 }
 						}
 					}
 				}
@@ -49,6 +49,28 @@ func TestParseSchemaValid(t *testing.T) {
 	}
 }
 
+func TestParseSchemaDefaultTypeIsString(t *testing.T) {
+	data := []byte(`{
+		"segments": {
+			"MSH": {
+				"fields": {
+					"fieldSeparator": { "index": 1 }
+				}
+			}
+		}
+	}`)
+
+	schema, err := hl7.ParseSchema(data)
+	if err != nil {
+		t.Fatalf("ParseSchema failed: %v", err)
+	}
+
+	field := schema.Segments["MSH"].Fields["fieldSeparator"]
+	if field.Type != "string" {
+		t.Errorf("expected default type string, got %q", field.Type)
+	}
+}
+
 func TestParseSchemaInvalidJSON(t *testing.T) {
 	_, err := hl7.ParseSchema([]byte(`{invalid`))
 	if err == nil {
@@ -75,7 +97,7 @@ func TestParseSchemaInvalidType(t *testing.T) {
 		"segments": {
 			"MSH": {
 				"fields": {
-					"1": { "name": "test", "type": "invalid" }
+					"test": { "index": 1, "type": "invalid" }
 				}
 			}
 		}
@@ -91,7 +113,7 @@ func TestParseSchemaObjectWithoutComponents(t *testing.T) {
 		"segments": {
 			"MSH": {
 				"fields": {
-					"1": { "name": "test", "type": "object" }
+					"test": { "index": 1, "type": "object" }
 				}
 			}
 		}
@@ -107,7 +129,7 @@ func TestParseSchemaArrayWithoutItems(t *testing.T) {
 		"segments": {
 			"MSH": {
 				"fields": {
-					"1": { "name": "test", "type": "array" }
+					"test": { "index": 1, "type": "array" }
 				}
 			}
 		}
@@ -118,19 +140,19 @@ func TestParseSchemaArrayWithoutItems(t *testing.T) {
 	}
 }
 
-func TestParseSchemaFieldWithoutName(t *testing.T) {
+func TestParseSchemaFieldWithoutIndex(t *testing.T) {
 	data := []byte(`{
 		"segments": {
 			"MSH": {
 				"fields": {
-					"1": { "name": "", "type": "string" }
+					"test": { "type": "string" }
 				}
 			}
 		}
 	}`)
 	_, err := hl7.ParseSchema(data)
 	if err == nil {
-		t.Fatal("expected error for field without name")
+		t.Fatal("expected error for field without index")
 	}
 }
 
@@ -139,7 +161,7 @@ func TestLoadSchemaFile(t *testing.T) {
 		"segments": {
 			"MSH": {
 				"fields": {
-					"1": { "name": "fieldSeparator", "type": "string" }
+					"fieldSeparator": { "index": 1 }
 				}
 			}
 		}

@@ -38,13 +38,16 @@ type MessageSchema struct {
 // SegmentSchema defines the fields within an HL7 segment.
 type SegmentSchema struct {
 	Fields map[string]*FieldSchema `json:"fields"`
+	Repeat bool                    `json:"repeat,omitempty"`
 }
 
-// FieldSchema defines a single field, including its name, type, and optional
+// FieldSchema defines a single field, including its HL7 index, type, and optional
 // components (for object types) or items (for array types).
+// The field name is the map key in the parent's Fields or Components map.
+// If Type is omitted, it defaults to "string".
 type FieldSchema struct {
-	Name       string                 `json:"name"`
-	Type       SchemaType             `json:"type"`
+	Index      int                    `json:"index,omitempty"`
+	Type       SchemaType             `json:"type,omitempty"`
 	Components map[string]*FieldSchema `json:"components,omitempty"`
 	Items      *FieldSchema           `json:"items,omitempty"`
 }
@@ -82,9 +85,9 @@ func (s *MessageSchema) Validate() error {
 		if len(seg.Fields) == 0 {
 			return &SchemaError{Path: "segments." + segName + ".fields", Err: errors.New("no fields defined")}
 		}
-		for fieldIdx, field := range seg.Fields {
-			path := fmt.Sprintf("segments.%s.fields.%s", segName, fieldIdx)
-			if err := validateField(path, field); err != nil {
+		for fieldName, field := range seg.Fields {
+			path := fmt.Sprintf("segments.%s.fields.%s", segName, fieldName)
+			if err := validateField(path, field, true); err != nil {
 				return err
 			}
 		}
@@ -92,13 +95,20 @@ func (s *MessageSchema) Validate() error {
 	return nil
 }
 
-func validateField(path string, f *FieldSchema) error {
+func validateField(path string, f *FieldSchema, requireIndex bool) error {
 	if f == nil {
 		return &SchemaError{Path: path, Err: errors.New("nil field")}
 	}
-	if f.Name == "" {
-		return &SchemaError{Path: path, Err: errors.New("field name is required")}
+
+	if requireIndex && f.Index <= 0 {
+		return &SchemaError{Path: path, Err: fmt.Errorf("index is required and must be > 0, got %d", f.Index)}
 	}
+
+	// Default type to string
+	if f.Type == "" {
+		f.Type = SchemaTypeString
+	}
+
 	if !validSchemaTypes[f.Type] {
 		return &SchemaError{Path: path, Err: fmt.Errorf("invalid type %q", f.Type)}
 	}
@@ -106,9 +116,9 @@ func validateField(path string, f *FieldSchema) error {
 		if len(f.Components) == 0 {
 			return &SchemaError{Path: path, Err: errors.New("object type requires components")}
 		}
-		for compIdx, comp := range f.Components {
-			compPath := fmt.Sprintf("%s.components.%s", path, compIdx)
-			if err := validateField(compPath, comp); err != nil {
+		for compName, comp := range f.Components {
+			compPath := fmt.Sprintf("%s.components.%s", path, compName)
+			if err := validateField(compPath, comp, true); err != nil {
 				return err
 			}
 		}
@@ -118,7 +128,7 @@ func validateField(path string, f *FieldSchema) error {
 			return &SchemaError{Path: path, Err: errors.New("array type requires items")}
 		}
 		itemsPath := path + ".items"
-		if err := validateField(itemsPath, f.Items); err != nil {
+		if err := validateField(itemsPath, f.Items, false); err != nil {
 			return err
 		}
 	}

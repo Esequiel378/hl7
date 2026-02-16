@@ -21,45 +21,45 @@ func main() {
 		"segments": {
 			"MSH": {
 				"fields": {
-					"1":  { "name": "fieldSeparator",     "type": "string" },
-					"2":  { "name": "encodingCharacters",  "type": "string" },
-					"3":  { "name": "sendingApplication",  "type": "string" },
-					"4":  { "name": "sendingFacility",     "type": "string" },
-					"7":  { "name": "dateTimeOfMessage",   "type": "timestamp" },
-					"9":  {
-						"name": "messageType", "type": "object",
+					"fieldSeparator":      { "index": 1 },
+					"encodingCharacters":  { "index": 2 },
+					"sendingApplication":  { "index": 3 },
+					"sendingFacility":     { "index": 4 },
+					"dateTimeOfMessage":   { "index": 7, "type": "timestamp" },
+					"messageType": {
+						"index": 9, "type": "object",
 						"components": {
-							"1": { "name": "code",    "type": "string" },
-							"2": { "name": "trigger", "type": "string" }
+							"code":    { "index": 1 },
+							"trigger": { "index": 2 }
 						}
 					},
-					"10": { "name": "messageControlID",    "type": "string" },
-					"11": { "name": "processingID",        "type": "string" },
-					"12": { "name": "versionID",           "type": "string" }
+					"messageControlID":    { "index": 10 },
+					"processingID":        { "index": 11 },
+					"versionID":           { "index": 12 }
 				}
 			},
 			"PID": {
 				"fields": {
-					"1": { "name": "setID", "type": "int" },
-					"3": {
-						"name": "patientIDList", "type": "array",
+					"setID": { "index": 1, "type": "int" },
+					"patientIDList": {
+						"index": 3, "type": "array",
 						"items": {
-							"name": "patientID", "type": "object",
+							"type": "object",
 							"components": {
-								"1": { "name": "id",   "type": "string" },
-								"5": { "name": "type", "type": "string" }
+								"id":   { "index": 1 },
+								"type": { "index": 5 }
 							}
 						}
 					},
-					"5": {
-						"name": "patientName", "type": "object",
+					"patientName": {
+						"index": 5, "type": "object",
 						"components": {
-							"1": { "name": "familyName", "type": "string" },
-							"2": { "name": "givenName",  "type": "string" }
+							"familyName": { "index": 1 },
+							"givenName":  { "index": 2 }
 						}
 					},
-					"7": { "name": "dateOfBirth", "type": "timestamp" },
-					"8": { "name": "gender",      "type": "string" }
+					"dateOfBirth": { "index": 7, "type": "timestamp" },
+					"gender":      { "index": 8 }
 				}
 			}
 		}

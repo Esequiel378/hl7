@@ -200,40 +200,40 @@ func init() {
 		"segments": {
 			"MSH": {
 				"fields": {
-					"1": { "name": "fieldSeparator", "type": "string" },
-					"2": { "name": "encodingCharacters", "type": "string" },
-					"3": { "name": "sendingApplication", "type": "string" },
-					"4": { "name": "sendingFacility", "type": "string" },
-					"5": { "name": "receivingApplication", "type": "string" },
-					"6": { "name": "receivingFacility", "type": "string" },
-					"7": { "name": "dateTimeOfMessage", "type": "string" },
-					"9": {
-						"name": "messageType", "type": "object",
+					"fieldSeparator":       { "index": 1 },
+					"encodingCharacters":   { "index": 2 },
+					"sendingApplication":   { "index": 3 },
+					"sendingFacility":      { "index": 4 },
+					"receivingApplication": { "index": 5 },
+					"receivingFacility":    { "index": 6 },
+					"dateTimeOfMessage":    { "index": 7 },
+					"messageType": {
+						"index": 9, "type": "object",
 						"components": {
-							"1": { "name": "messageCode", "type": "string" },
-							"2": { "name": "triggerEvent", "type": "string" }
+							"messageCode":  { "index": 1 },
+							"triggerEvent": { "index": 2 }
 						}
 					},
-					"10": { "name": "messageControlID", "type": "string" },
-					"11": { "name": "processingID", "type": "string" },
-					"12": { "name": "versionID", "type": "string" }
+					"messageControlID": { "index": 10 },
+					"processingID":     { "index": 11 },
+					"versionID":        { "index": 12 }
 				}
 			},
 			"PID": {
 				"fields": {
-					"1": { "name": "setID", "type": "string" },
-					"3": { "name": "patientIdentifierList", "type": "string" },
-					"5": { "name": "patientName", "type": "string" },
-					"7": { "name": "dateOfBirth", "type": "string" },
-					"8": { "name": "gender", "type": "string" }
+					"setID":                 { "index": 1 },
+					"patientIdentifierList": { "index": 3 },
+					"patientName":           { "index": 5 },
+					"dateOfBirth":           { "index": 7 },
+					"gender":                { "index": 8 }
 				}
 			},
 			"PV1": {
 				"fields": {
-					"1": { "name": "setID", "type": "string" },
-					"2": { "name": "patientClass", "type": "string" },
-					"3": { "name": "assignedPatientLocation", "type": "string" },
-					"10": { "name": "hospitalService", "type": "string" }
+					"setID":                   { "index": 1 },
+					"patientClass":            { "index": 2 },
+					"assignedPatientLocation": { "index": 3 },
+					"hospitalService":         { "index": 10 }
 				}
 			}
 		}
