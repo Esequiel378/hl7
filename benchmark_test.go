@@ -191,6 +191,117 @@ func BenchmarkMarshalMultiSegment(b *testing.B) {
 	}
 }
 
+// Schema-based benchmarks
+var benchSchema *hl7.MessageSchema
+
+func init() {
+	var err error
+	benchSchema, err = hl7.ParseSchema([]byte(`{
+		"segments": {
+			"MSH": {
+				"fields": {
+					"1": { "name": "fieldSeparator", "type": "string" },
+					"2": { "name": "encodingCharacters", "type": "string" },
+					"3": { "name": "sendingApplication", "type": "string" },
+					"4": { "name": "sendingFacility", "type": "string" },
+					"5": { "name": "receivingApplication", "type": "string" },
+					"6": { "name": "receivingFacility", "type": "string" },
+					"7": { "name": "dateTimeOfMessage", "type": "string" },
+					"9": {
+						"name": "messageType", "type": "object",
+						"components": {
+							"1": { "name": "messageCode", "type": "string" },
+							"2": { "name": "triggerEvent", "type": "string" }
+						}
+					},
+					"10": { "name": "messageControlID", "type": "string" },
+					"11": { "name": "processingID", "type": "string" },
+					"12": { "name": "versionID", "type": "string" }
+				}
+			},
+			"PID": {
+				"fields": {
+					"1": { "name": "setID", "type": "string" },
+					"3": { "name": "patientIdentifierList", "type": "string" },
+					"5": { "name": "patientName", "type": "string" },
+					"7": { "name": "dateOfBirth", "type": "string" },
+					"8": { "name": "gender", "type": "string" }
+				}
+			},
+			"PV1": {
+				"fields": {
+					"1": { "name": "setID", "type": "string" },
+					"2": { "name": "patientClass", "type": "string" },
+					"3": { "name": "assignedPatientLocation", "type": "string" },
+					"10": { "name": "hospitalService", "type": "string" }
+				}
+			}
+		}
+	}`))
+	if err != nil {
+		panic(err)
+	}
+}
+
+func BenchmarkSchemaUnmarshalSimple(b *testing.B) {
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		if _, err := hl7.UnmarshalWithSchema(simpleMSH, benchSchema); err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func BenchmarkSchemaUnmarshalMultiSegment(b *testing.B) {
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		if _, err := hl7.UnmarshalWithSchema(multiSegmentMessage, benchSchema); err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func BenchmarkSchemaMarshalSimple(b *testing.B) {
+	data := map[string]any{
+		"MSH": map[string]any{
+			"fieldSeparator":       "|",
+			"encodingCharacters":   "^~\\&",
+			"sendingApplication":   "App1",
+			"sendingFacility":      "Fac1",
+			"receivingApplication": "App2",
+			"receivingFacility":    "Fac2",
+			"dateTimeOfMessage":    "20250205120000",
+			"messageType": map[string]any{
+				"messageCode":  "ADT",
+				"triggerEvent": "A01",
+			},
+			"messageControlID": "1234",
+			"processingID":     "P",
+			"versionID":        "2.3",
+		},
+	}
+
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		if _, err := hl7.MarshalWithSchema(data, benchSchema); err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func BenchmarkSchemaRoundTrip(b *testing.B) {
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		result, err := hl7.UnmarshalWithSchema(multiSegmentMessage, benchSchema)
+		if err != nil {
+			b.Fatal(err)
+		}
+		if _, err := hl7.MarshalWithSchema(result, benchSchema); err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
 func BenchmarkRoundTrip(b *testing.B) {
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {

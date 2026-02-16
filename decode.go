@@ -41,6 +41,59 @@ func implementsUnmarshaler(val reflect.Value) bool {
 	return false
 }
 
+// segmentLine represents a parsed HL7 segment line with its name, fields, and separators.
+type segmentLine struct {
+	name               Segment
+	fields             []string
+	fieldSeparator     string
+	encodingCharacters string
+}
+
+// parseMessage scans raw HL7 data and returns parsed segment lines with detected separators.
+func parseMessage(data []byte) ([]segmentLine, error) {
+	fieldSeparator := "|"
+	encodingCharacters := "^~\\&"
+
+	var lines []segmentLine
+
+	scanner := bufio.NewScanner(bytes.NewReader(data))
+	scanner.Buffer(make([]byte, 0, 1024*1024), 10*1024*1024)
+	for scanner.Scan() {
+		line := scanner.Text()
+
+		if strings.HasPrefix(line, "MSH") && len(line) > 3 {
+			fieldSeparator = string(line[3])
+		}
+
+		parts := strings.Split(line, fieldSeparator)
+		if len(parts) == 0 {
+			continue
+		}
+
+		if strings.HasPrefix(parts[0], "MSH") && len(parts) > 1 {
+			encodingCharacters = parts[1]
+		}
+
+		segment := Segment(parts[0])
+		if segment == "" {
+			return nil, fmt.Errorf("%w: %s", ErrSegmentInvalid, segment)
+		}
+
+		lines = append(lines, segmentLine{
+			name:               segment,
+			fields:             parts,
+			fieldSeparator:     fieldSeparator,
+			encodingCharacters: encodingCharacters,
+		})
+	}
+
+	if err := scanner.Err(); err != nil {
+		return nil, fmt.Errorf("hl7: failed to read message: %w", err)
+	}
+
+	return lines, nil
+}
+
 // Unmarshal parses the HL7 data into the provided struct v.
 // v must be a pointer to a struct, and its fields should be tagged with `hl7:"segment:<name>"` for segments,
 // and `hl7:"<index>"` for fields within the segment.
@@ -71,48 +124,21 @@ func Unmarshal(data []byte, v any) error {
 		tagToField[tag] = field
 	}
 
-	fieldSeparator := "|"
-	encodingCharacters := "^~\\&"
+	segments, err := parseMessage(data)
+	if err != nil {
+		return err
+	}
 
-	// Scan the HL7 message line by line
-	scanner := bufio.NewScanner(bytes.NewReader(data))
-	// Increase the scanner buffer to handle long HL7 segments
-	scanner.Buffer(make([]byte, 0, 1024*1024), 10*1024*1024)
-	for scanner.Scan() {
-		line := scanner.Text()
-
-		// Extract the field separator from the MSH segment if present
-		if strings.HasPrefix(line, "MSH") && len(line) > 3 {
-			fieldSeparator = string(line[3])
-		}
-
-		parts := strings.Split(line, fieldSeparator)
-		if len(parts) == 0 {
-			continue
-		}
-
-		if strings.HasPrefix(parts[0], "MSH") && len(parts) > 1 {
-			encodingCharacters = parts[1]
-		}
-
-		segment := Segment(parts[0])
-		if segment == "" {
-			return fmt.Errorf("%w: %s", ErrSegmentInvalid, segment)
-		}
-
-		segmentField, ok := tagToField[segment]
+	for _, seg := range segments {
+		segmentField, ok := tagToField[seg.name]
 		if !ok {
 			continue // Ignore unknown segments
 		}
 
 		// Populate the struct fields with parsed values
-		if err := setValuesByIndex(segment, segmentField, parts, fieldSeparator, encodingCharacters, 0); err != nil {
+		if err := setValuesByIndex(seg.name, segmentField, seg.fields, seg.fieldSeparator, seg.encodingCharacters, 0); err != nil {
 			return err
 		}
-	}
-
-	if err := scanner.Err(); err != nil {
-		return fmt.Errorf("hl7: failed to read message: %w", err)
 	}
 
 	return nil
