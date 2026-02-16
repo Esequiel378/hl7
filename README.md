@@ -3,19 +3,22 @@
 [![Go Reference](https://pkg.go.dev/badge/github.com/esequiel378/hl7.svg)](https://pkg.go.dev/github.com/esequiel378/hl7)
 [![Go Report Card](https://goreportcard.com/badge/github.com/esequiel378/hl7)](https://goreportcard.com/report/github.com/esequiel378/hl7)
 
-A lightweight, dependency-free Go library for parsing and building HL7 v2.x messages. It provides a simple and powerful way to handle one of the most common file formats in healthcare, leveraging Go's robust type system and error handling.
+A lightweight, dependency-free Go library for parsing and building HL7 v2.x messages. It provides three flexible approaches to handle one of the most common formats in healthcare, leveraging Go's robust type system and error handling.
 
 ## Features
 
-- **Bidirectional Conversion**: Both `Unmarshal` (parse) and `Marshal` (build) HL7 messages
+- **Three Parsing Modes**: Struct-based, schema-based (JSON), and generic (schema-less)
+- **Bidirectional Conversion**: Both parse and build HL7 messages in all modes
 - **Struct Tag Parsing**: Define HL7 mappings with intuitive struct tags (`hl7:"segment:<name>"` and `hl7:"<index>"`)
-- **Nested Structs**: Easily manage complex fields like patient names or addresses using component separators (^)
-- **Repetition Support**: Parse repeating fields (~) into Go slices
+- **JSON Schema Support**: Define message schemas as JSON for dynamic, runtime-configurable parsing
+- **Generic Parsing**: Parse any HL7 message without structs or schemas into a structured representation
+- **Nested Structs**: Manage complex fields like patient names using component separators (`^`)
+- **Repetition Support**: Parse repeating fields (`~`) into Go slices
 - **Timestamp Type**: Built-in `hl7.Timestamp` type for automatic date/time parsing
 - **Custom Types**: Implement `Unmarshaler` or `Marshaler` interfaces for custom field handling
-- **Version Agnostic**: Supports parsing any HL7 v2.x version
+- **Version Agnostic**: Supports any HL7 v2.x version
 - **Rich Errors**: Field-level error context for easier debugging
-- **Dependency-Free**: No external dependencies—ready to go out of the box
+- **Dependency-Free**: No external dependencies
 
 ## Installation
 
@@ -121,6 +124,122 @@ func main() {
 }
 ```
 
+## Parsing Approaches
+
+This library offers three ways to parse HL7 messages. Choose the one that fits your use case:
+
+| Approach | Best For | Output Type |
+|----------|----------|-------------|
+| **Struct-based** | Known message formats with compile-time safety | Go structs |
+| **Schema-based** | Dynamic schemas loaded at runtime (files, databases) | `map[string]any` |
+| **Generic** | Exploring unknown messages or building tooling | `*GenericMessage` |
+
+### Struct-Based
+
+Define Go structs with `hl7` tags. Best when you know the message structure at compile time.
+
+```go
+type Message struct {
+    MSH struct {
+        FieldSeparator     string       `hl7:"1"`
+        EncodingCharacters string       `hl7:"2"`
+        SendingApplication string       `hl7:"3"`
+        MessageType        struct {
+            Code    string `hl7:"1"`
+            Trigger string `hl7:"2"`
+        } `hl7:"9"`
+    } `hl7:"segment:MSH"`
+    PID struct {
+        SetID       string        `hl7:"1"`
+        PatientName struct {
+            FamilyName string `hl7:"1"`
+            GivenName  string `hl7:"2"`
+        } `hl7:"5"`
+        DateOfBirth hl7.Timestamp `hl7:"7"`
+    } `hl7:"segment:PID"`
+}
+
+var msg Message
+err := hl7.Unmarshal(data, &msg)
+```
+
+### Schema-Based
+
+Define schemas as JSON and parse at runtime. Useful when message structures are configured externally or vary between integrations.
+
+```go
+schemaJSON := []byte(`{
+    "segments": {
+        "MSH": {
+            "fields": {
+                "fieldSeparator":     { "index": 1 },
+                "encodingCharacters": { "index": 2 },
+                "sendingApplication": { "index": 3 },
+                "messageType": {
+                    "index": 9, "type": "object",
+                    "components": {
+                        "code":    { "index": 1 },
+                        "trigger": { "index": 2 }
+                    }
+                },
+                "versionID": { "index": 12 }
+            }
+        },
+        "PID": {
+            "fields": {
+                "setID":       { "index": 1, "type": "int" },
+                "patientName": {
+                    "index": 5, "type": "object",
+                    "components": {
+                        "familyName": { "index": 1 },
+                        "givenName":  { "index": 2 }
+                    }
+                },
+                "dateOfBirth": { "index": 7, "type": "timestamp" },
+                "gender":      { "index": 8 }
+            }
+        }
+    }
+}`)
+
+schema, err := hl7.ParseSchema(schemaJSON)
+// or load from a file:
+// schema, err := hl7.LoadSchemaFile("path/to/schema.json")
+
+result, err := hl7.UnmarshalWithSchema(data, schema)
+// result is map[string]any:
+// result["MSH"].(map[string]any)["sendingApplication"] => "HIS"
+// result["PID"].(map[string]any)["patientName"].(map[string]any)["familyName"] => "Doe"
+```
+
+Schema field types: `string` (default), `int`, `float`, `bool`, `timestamp`, `object` (with `components`), `array` (with `items`).
+
+Schemas can also be used for marshaling:
+
+```go
+output, err := hl7.MarshalWithSchema(result, schema)
+```
+
+### Generic (Schema-Less)
+
+Parse any HL7 message into a structured representation without defining structs or schemas. Ideal for building tools, inspecting unknown messages, or converting to JSON.
+
+```go
+msg, err := hl7.ParseGeneric(data)
+
+// Access segments, fields, components, and repetitions programmatically
+for _, seg := range msg.Segments {
+    fmt.Printf("Segment: %s\n", seg.Name)
+    for _, field := range seg.Fields {
+        fmt.Printf("  %s-%d: %s\n", seg.Name, field.Index, field.Value)
+    }
+}
+
+// Or serialize directly to JSON
+jsonData, _ := json.MarshalIndent(msg, "", "  ")
+fmt.Println(string(jsonData))
+```
+
 ## Advanced Usage
 
 ### Using the Timestamp Type
@@ -177,6 +296,23 @@ type PIDWithStructs struct {
 }
 ```
 
+Schema-based repetitions use the `array` type with `items`:
+
+```json
+{
+    "patientIDList": {
+        "index": 3, "type": "array",
+        "items": {
+            "type": "object",
+            "components": {
+                "id":   { "index": 1 },
+                "type": { "index": 5 }
+            }
+        }
+    }
+}
+```
+
 ### Custom Field Types
 
 Implement the `Unmarshaler` interface for custom parsing:
@@ -221,6 +357,22 @@ opts := hl7.MarshalOptions{
 data, err := hl7.MarshalWithOptions(msg, opts)
 ```
 
+### HL7 to JSON Conversion
+
+A common integration pattern for bridging HL7 v2 systems with modern REST/JSON APIs:
+
+```go
+// HL7 -> JSON
+schema, _ := hl7.LoadSchemaFile("adt_a01.json")
+result, _ := hl7.UnmarshalWithSchema(hl7Data, schema)
+jsonData, _ := json.MarshalIndent(result, "", "  ")
+
+// JSON -> HL7
+var parsed map[string]any
+json.Unmarshal(jsonData, &parsed)
+hl7Data, _ := hl7.MarshalWithSchema(parsed, schema)
+```
+
 ## Error Handling
 
 Errors include field-level context for debugging:
@@ -234,6 +386,36 @@ if err != nil {
             fieldErr.Segment, fieldErr.Field, fieldErr.Err, fieldErr.Value)
     }
 }
+```
+
+Schema errors include the JSON path to the problematic definition:
+
+```go
+schema, err := hl7.ParseSchema(schemaJSON)
+if err != nil {
+    var schemaErr *hl7.SchemaError
+    if errors.As(err, &schemaErr) {
+        fmt.Printf("Schema error at %s: %v\n", schemaErr.Path, schemaErr.Err)
+    }
+}
+```
+
+## Examples
+
+Complete runnable examples are available in the [`examples/`](./examples) directory:
+
+- [`struct-based`](./examples/struct-based) - Traditional struct tag approach
+- [`schema-based`](./examples/schema-based) - Dynamic JSON schema parsing
+- [`generic`](./examples/generic) - Schema-less parsing
+- [`hl7-to-json`](./examples/hl7-to-json) - HL7/JSON conversion pipeline
+
+Run any example with:
+
+```bash
+go run ./examples/struct-based
+go run ./examples/schema-based
+go run ./examples/generic
+go run ./examples/hl7-to-json
 ```
 
 ## Benchmarks
