@@ -46,7 +46,7 @@ func ParseGeneric(data []byte) (*GenericMessage, error) {
 	msg := &GenericMessage{}
 
 	for _, seg := range segments {
-		gs := GenericSegment{Name: string(seg.name)}
+		gs := GenericSegment{Name: string(seg.name), Fields: []GenericField{}}
 
 		componentSep := "^"
 		if len(seg.encodingCharacters) > 0 {
