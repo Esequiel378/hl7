@@ -50,3 +50,17 @@ func (e *FieldError) Error() string {
 func (e *FieldError) Unwrap() error {
 	return e.Err
 }
+
+// SchemaError represents an error in schema definition or validation.
+type SchemaError struct {
+	Path string // The schema path that caused the error (e.g., "segments.PID.fields.3")
+	Err  error  // The underlying error
+}
+
+func (e *SchemaError) Error() string {
+	return fmt.Sprintf("hl7: schema %s: %v", e.Path, e.Err)
+}
+
+func (e *SchemaError) Unwrap() error {
+	return e.Err
+}
