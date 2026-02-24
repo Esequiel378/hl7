@@ -60,6 +60,11 @@ func main() {
 		os.Exit(2)
 	}
 
+	if inputFile == "" && len(fs.Args()) == 0 && isTerminal(os.Stdin) {
+		fs.Usage()
+		os.Exit(0)
+	}
+
 	input, err := readInput(inputFile, fs.Args())
 	if err != nil {
 		fatalf("error reading input: %v", err)
@@ -107,6 +112,14 @@ func marshalJSON(v any, compact bool) ([]byte, error) {
 		return json.Marshal(v)
 	}
 	return json.MarshalIndent(v, "", "  ")
+}
+
+func isTerminal(f *os.File) bool {
+	stat, err := f.Stat()
+	if err != nil {
+		return false
+	}
+	return (stat.Mode() & os.ModeCharDevice) != 0
 }
 
 func fatalf(format string, args ...any) {
