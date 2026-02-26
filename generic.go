@@ -34,6 +34,21 @@ type GenericComponent struct {
 	Value string `json:"value"`
 }
 
+// ParseGenericMulti parses multiple HL7 messages from a single input,
+// splitting at MSH segment boundaries. Returns one GenericMessage per message.
+func ParseGenericMulti(data []byte) ([]*GenericMessage, error) {
+	chunks := splitMessages(data)
+	msgs := make([]*GenericMessage, 0, len(chunks))
+	for _, chunk := range chunks {
+		msg, err := ParseGeneric(chunk)
+		if err != nil {
+			return nil, err
+		}
+		msgs = append(msgs, msg)
+	}
+	return msgs, nil
+}
+
 // ParseGeneric parses an HL7 message into a GenericMessage without requiring
 // a predefined schema or struct. All fields, components, and repetitions are
 // preserved in the output.

@@ -49,8 +49,38 @@ type segmentLine struct {
 	encodingCharacters string
 }
 
+// splitMessages splits raw HL7 data into individual message byte slices,
+// starting a new message at each MSH segment boundary.
+func splitMessages(data []byte) [][]byte {
+	// Normalize \r\n and standalone \r (HL7 standard segment terminator) to \n.
+	data = bytes.ReplaceAll(data, []byte("\r\n"), []byte("\n"))
+	data = bytes.ReplaceAll(data, []byte("\r"), []byte("\n"))
+	lines := bytes.Split(data, []byte("\n"))
+	var messages [][]byte
+	var current [][]byte
+
+	for _, line := range lines {
+		trimmed := bytes.TrimSpace(line)
+		if bytes.HasPrefix(trimmed, []byte("MSH")) && len(current) > 0 {
+			messages = append(messages, bytes.Join(current, []byte("\n")))
+			current = nil
+		}
+		if len(trimmed) > 0 {
+			current = append(current, line)
+		}
+	}
+	if len(current) > 0 {
+		messages = append(messages, bytes.Join(current, []byte("\n")))
+	}
+	return messages
+}
+
 // parseMessage scans raw HL7 data and returns parsed segment lines with detected separators.
 func parseMessage(data []byte) ([]segmentLine, error) {
+	// Normalize \r\n and standalone \r (HL7 standard segment terminator) to \n.
+	data = bytes.ReplaceAll(data, []byte("\r\n"), []byte("\n"))
+	data = bytes.ReplaceAll(data, []byte("\r"), []byte("\n"))
+
 	fieldSeparator := "|"
 	encodingCharacters := "^~\\&"
 

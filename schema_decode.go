@@ -6,6 +6,21 @@ import (
 	"strings"
 )
 
+// UnmarshalMultiWithSchema parses multiple HL7 messages using a schema definition,
+// returning a slice of maps, one per message.
+func UnmarshalMultiWithSchema(data []byte, schema *MessageSchema) ([]map[string]any, error) {
+	chunks := splitMessages(data)
+	results := make([]map[string]any, 0, len(chunks))
+	for _, chunk := range chunks {
+		result, err := UnmarshalWithSchema(chunk, schema)
+		if err != nil {
+			return nil, err
+		}
+		results = append(results, result)
+	}
+	return results, nil
+}
+
 // UnmarshalWithSchema parses HL7 data using a schema definition,
 // returning a map[string]any with field names as keys.
 func UnmarshalWithSchema(data []byte, schema *MessageSchema) (map[string]any, error) {
