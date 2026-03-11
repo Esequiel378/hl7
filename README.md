@@ -400,6 +400,165 @@ if err != nil {
 }
 ```
 
+## CLI
+
+The `hl7` command-line tool parses HL7 v2.x messages and outputs JSON. It supports all three parsing modes (generic, schema-based) and reads from a file or stdin.
+
+### Installation
+
+```bash
+go install github.com/esequiel378/hl7/cmd/hl7@latest
+```
+
+### Usage
+
+```
+hl7 [flags] [file]
+
+Flags:
+  -f, --file <file>     HL7 input file.
+  -s, --schema <file>   JSON schema file for schema-based parsing.
+                        Without this flag the message is parsed generically.
+  -c, --compact         Emit compact JSON instead of pretty-printed output.
+  -h, --help            Show this help text.
+```
+
+### Examples
+
+**Generic parse from stdin** — parse any HL7 message without a schema:
+
+```bash
+echo 'MSH|^~\&|App|Fac|||20250101||ADT^A01|1|P|2.7' | hl7
+```
+
+```json
+[
+  {
+    "name": "MSH",
+    "fields": [
+      { "index": 1, "value": "|" },
+      { "index": 2, "value": "^~\\&" },
+      { "index": 3, "value": "App" },
+      ...
+    ]
+  }
+]
+```
+
+**Generic parse from a file:**
+
+```bash
+hl7 message.hl7
+# or
+hl7 --file message.hl7
+```
+
+**Schema-based parse** — extract only the fields defined in your schema:
+
+```bash
+hl7 --schema schema.json --file message.hl7
+```
+
+Given [`examples/cli/message.hl7`](./examples/cli/message.hl7):
+
+```
+MSH|^~\&|HIS|General Hospital|EHR|EHR|202501151030||ADT^A01|MSG00001|P|2.5
+PID|1||123456||Doe^John^A||19850315|M|||123 Main St^^Springfield^IL^62701||555-867-5309
+PV1|1|I|4N^401^A||||||||SUR
+```
+
+And [`examples/cli/schema.json`](./examples/cli/schema.json):
+
+```json
+{
+  "segments": {
+    "MSH": {
+      "fields": {
+        "sendingApplication": { "index": 3 },
+        "messageType": {
+          "index": 9, "type": "object",
+          "components": { "code": { "index": 1 }, "trigger": { "index": 2 } }
+        },
+        "versionID": { "index": 12 }
+      }
+    },
+    "PID": {
+      "fields": {
+        "patientName": {
+          "index": 5, "type": "object",
+          "components": {
+            "familyName": { "index": 1 },
+            "givenName":  { "index": 2 }
+          }
+        },
+        "dateOfBirth": { "index": 7 },
+        "gender":      { "index": 8 }
+      }
+    }
+  }
+}
+```
+
+Running:
+
+```bash
+hl7 --schema examples/cli/schema.json examples/cli/message.hl7
+```
+
+Produces:
+
+```json
+{
+  "MSH": {
+    "dateTimeOfMessage": "202501151030",
+    "encodingCharacters": "^~\\&",
+    "fieldSeparator": "|",
+    "messageControlID": "MSG00001",
+    "messageType": {
+      "code": "ADT",
+      "trigger": "A01"
+    },
+    "processingID": "P",
+    "receivingApplication": "EHR",
+    "receivingFacility": "EHR",
+    "sendingApplication": "HIS",
+    "sendingFacility": "General Hospital",
+    "versionID": "2.5"
+  },
+  "PID": {
+    "address": "123 Main St^^Springfield^IL^62701",
+    "dateOfBirth": "19850315",
+    "gender": "M",
+    "patientID": "123456",
+    "patientName": {
+      "familyName": "Doe",
+      "givenName": "John",
+      "middleName": "A"
+    },
+    "phoneNumber": "555-867-5309",
+    "setID": "1"
+  },
+  "PV1": {
+    "assignedPatientLocation": "4N^401^A",
+    "hospitalService": "",
+    "patientClass": "I",
+    "setID": "1"
+  }
+}
+```
+
+**Compact output** — useful for piping into `jq` or other tools:
+
+```bash
+hl7 -c -s schema.json message.hl7 | jq '.PID.patientName'
+```
+
+**Pipeline usage** — convert HL7 from another process:
+
+```bash
+cat message.hl7 | hl7 --schema schema.json --compact
+```
+
 ## Examples
 
 Complete runnable examples are available in the [`examples/`](./examples) directory:
@@ -408,6 +567,7 @@ Complete runnable examples are available in the [`examples/`](./examples) direct
 - [`schema-based`](./examples/schema-based) - Dynamic JSON schema parsing
 - [`generic`](./examples/generic) - Schema-less parsing
 - [`hl7-to-json`](./examples/hl7-to-json) - HL7/JSON conversion pipeline
+- [`cli`](./examples/cli) - Sample files for the `hl7` CLI tool
 
 Run any example with:
 
