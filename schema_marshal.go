@@ -27,8 +27,6 @@ func MarshalWithSchemaOptions(v map[string]any, schema *MessageSchema, opts Mars
 		opts.SubcomponentSeparator,
 	})
 
-	var buf bytes.Buffer
-
 	// We need a stable ordering for segments. HL7 messages typically start with MSH.
 	// Collect segment names in schema order, but ensure MSH comes first.
 	segNames := make([]string, 0, len(schema.Segments))
@@ -44,7 +42,8 @@ func MarshalWithSchemaOptions(v map[string]any, schema *MessageSchema, opts Mars
 		segNames = append([]string{"MSH"}, segNames...)
 	}
 
-	first := true
+	var allLines [][]byte
+
 	for _, segName := range segNames {
 		segData, ok := v[segName]
 		if !ok {
@@ -67,11 +66,13 @@ func MarshalWithSchemaOptions(v map[string]any, schema *MessageSchema, opts Mars
 				if err != nil {
 					return nil, err
 				}
-				if !first {
-					buf.WriteString(opts.LineEnding)
+				allLines = append(allLines, line)
+
+				noteLines, err := marshalNotesFromSchema(segMap, segSchema, fs, cs, rs, ec, opts)
+				if err != nil {
+					return nil, err
 				}
-				buf.Write(line)
-				first = false
+				allLines = append(allLines, noteLines...)
 			}
 		} else {
 			segMap, ok := segData.(map[string]any)
@@ -83,16 +84,44 @@ func MarshalWithSchemaOptions(v map[string]any, schema *MessageSchema, opts Mars
 			if err != nil {
 				return nil, err
 			}
+			allLines = append(allLines, line)
 
-			if !first {
-				buf.WriteString(opts.LineEnding)
+			noteLines, err := marshalNotesFromSchema(segMap, segSchema, fs, cs, rs, ec, opts)
+			if err != nil {
+				return nil, err
 			}
-			buf.Write(line)
-			first = false
+			allLines = append(allLines, noteLines...)
 		}
 	}
 
-	return buf.Bytes(), nil
+	return bytes.Join(allLines, []byte(opts.LineEnding)), nil
+}
+
+func marshalNotesFromSchema(segMap map[string]any, segSchema *SegmentSchema, fs, cs, rs, ec string, opts MarshalOptions) ([][]byte, error) {
+	if segSchema.Notes == nil {
+		return nil, nil
+	}
+	notesData, ok := segMap["notes"]
+	if !ok {
+		return nil, nil
+	}
+	notes, ok := notesData.([]any)
+	if !ok {
+		return nil, nil
+	}
+	var lines [][]byte
+	for _, note := range notes {
+		noteMap, ok := note.(map[string]any)
+		if !ok {
+			continue
+		}
+		line, err := marshalSegmentFromMap("NTE", noteMap, segSchema.Notes, fs, cs, rs, ec, opts)
+		if err != nil {
+			return nil, err
+		}
+		lines = append(lines, line)
+	}
+	return lines, nil
 }
 
 func marshalSegmentFromMap(name string, data map[string]any, schema *SegmentSchema, fs, cs, rs, ec string, opts MarshalOptions) ([]byte, error) {

@@ -127,6 +127,8 @@ func parseMessage(data []byte) ([]segmentLine, error) {
 // Unmarshal parses the HL7 data into the provided struct v.
 // v must be a pointer to a struct, and its fields should be tagged with `hl7:"segment:<name>"` for segments,
 // and `hl7:"<index>"` for fields within the segment.
+// NTE segments are attached to the preceding segment if that segment has a field tagged `hl7:"notes"`.
+// If no such field exists, NTE segments are ignored.
 func Unmarshal(data []byte, v any) error {
 	// Validate that v is a pointer to a struct
 	rv := reflect.ValueOf(v)
@@ -159,7 +161,28 @@ func Unmarshal(data []byte, v any) error {
 		return err
 	}
 
+	var lastSegment reflect.Value
+
 	for _, seg := range segments {
+		if seg.name == "NTE" {
+			if !lastSegment.IsValid() {
+				continue
+			}
+			notesField, ok := findNotesField(lastSegment)
+			if !ok {
+				continue
+			}
+			elemType := notesField.Type().Elem()
+			elem := reflect.New(elemType).Elem()
+			if elemType.Kind() == reflect.Struct {
+				if err := setValuesByIndex("NTE", elem, seg.fields, seg.fieldSeparator, seg.encodingCharacters, 0); err != nil {
+					return err
+				}
+			}
+			notesField.Set(reflect.Append(notesField, elem))
+			continue
+		}
+
 		segmentField, ok := tagToField[seg.name]
 		if !ok {
 			continue // Ignore unknown segments
@@ -169,9 +192,20 @@ func Unmarshal(data []byte, v any) error {
 		if err := setValuesByIndex(seg.name, segmentField, seg.fields, seg.fieldSeparator, seg.encodingCharacters, 0); err != nil {
 			return err
 		}
+		lastSegment = segmentField
 	}
 
 	return nil
+}
+
+// findNotesField returns the field tagged hl7:"notes" in a struct value, if any.
+func findNotesField(v reflect.Value) (reflect.Value, bool) {
+	for i := 0; i < v.NumField(); i++ {
+		if v.Type().Field(i).Tag.Get("hl7") == "notes" {
+			return v.Field(i), true
+		}
+	}
+	return reflect.Value{}, false
 }
 
 var ErrFieldIndexOutOfBounds = errors.New("hl7: field index out of bounds")
@@ -191,7 +225,7 @@ func setValuesByIndex(segment Segment, parent reflect.Value, fields []string, fs
 		parentField := parent.Field(i)
 		sIndex, err := getHL7FieldIndexFromTag(parent.Type().Field(i).Tag.Get("hl7"))
 		if err != nil {
-			return err
+			continue // skip empty or non-numeric tags (e.g. "notes")
 		}
 
 		// HL7 field indexing:

@@ -469,3 +469,116 @@ func TestMarshalWithSchemaRepeatSegments(t *testing.T) {
 		t.Errorf("expected OBX|2|ST|||Normal, got: %s", str)
 	}
 }
+
+func TestMarshalWithSchemaNTE(t *testing.T) {
+	schema := mustParseSchema(t, `{
+		"segments": {
+			"PID": {
+				"fields": {
+					"setID":     { "index": 1 },
+					"patientID": { "index": 3 }
+				},
+				"notes": {
+					"fields": {
+						"setID":   { "index": 1 },
+						"comment": { "index": 3 }
+					}
+				}
+			}
+		}
+	}`)
+
+	data := map[string]any{
+		"PID": map[string]any{
+			"setID":     "1",
+			"patientID": "12345",
+			"notes": []any{
+				map[string]any{"setID": "1", "comment": "Patient has diabetes"},
+				map[string]any{"setID": "2", "comment": "Also on warfarin"},
+			},
+		},
+	}
+
+	out, err := hl7.MarshalWithSchema(data, schema)
+	if err != nil {
+		t.Fatalf("MarshalWithSchema failed: %v", err)
+	}
+
+	str := string(out)
+	lines := strings.Split(str, "\r")
+
+	if len(lines) != 3 {
+		t.Fatalf("expected 3 lines (PID + 2 NTE), got %d: %q", len(lines), str)
+	}
+	if !strings.HasPrefix(lines[0], "PID|") {
+		t.Errorf("line 0 should be PID, got: %s", lines[0])
+	}
+	if lines[1] != "NTE|1||Patient has diabetes" {
+		t.Errorf("line 1 mismatch, got: %s", lines[1])
+	}
+	if lines[2] != "NTE|2||Also on warfarin" {
+		t.Errorf("line 2 mismatch, got: %s", lines[2])
+	}
+}
+
+func TestMarshalWithSchemaNTERepeat(t *testing.T) {
+	schema := mustParseSchema(t, `{
+		"segments": {
+			"OBX": {
+				"repeat": true,
+				"fields": {
+					"setID": { "index": 1 },
+					"value": { "index": 5 }
+				},
+				"notes": {
+					"fields": {
+						"comment": { "index": 3 }
+					}
+				}
+			}
+		}
+	}`)
+
+	data := map[string]any{
+		"OBX": []any{
+			map[string]any{
+				"setID": "1",
+				"value": "positive",
+				"notes": []any{
+					map[string]any{"comment": "note for OBX 1"},
+				},
+			},
+			map[string]any{
+				"setID": "2",
+				"value": "negative",
+				"notes": []any{
+					map[string]any{"comment": "note for OBX 2"},
+				},
+			},
+		},
+	}
+
+	out, err := hl7.MarshalWithSchema(data, schema)
+	if err != nil {
+		t.Fatalf("MarshalWithSchema failed: %v", err)
+	}
+
+	str := string(out)
+	lines := strings.Split(str, "\r")
+
+	if len(lines) != 4 {
+		t.Fatalf("expected 4 lines, got %d: %q", len(lines), str)
+	}
+	if !strings.HasPrefix(lines[0], "OBX|1|") {
+		t.Errorf("line 0: %s", lines[0])
+	}
+	if lines[1] != "NTE|||note for OBX 1" {
+		t.Errorf("line 1: %s", lines[1])
+	}
+	if !strings.HasPrefix(lines[2], "OBX|2|") {
+		t.Errorf("line 2: %s", lines[2])
+	}
+	if lines[3] != "NTE|||note for OBX 2" {
+		t.Errorf("line 3: %s", lines[3])
+	}
+}

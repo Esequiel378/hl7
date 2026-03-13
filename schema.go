@@ -39,6 +39,7 @@ type MessageSchema struct {
 type SegmentSchema struct {
 	Fields map[string]*FieldSchema `json:"fields"`
 	Repeat bool                    `json:"repeat,omitempty"`
+	Notes  *SegmentSchema          `json:"notes,omitempty"`
 }
 
 // FieldSchema defines a single field, including its HL7 index, type, and optional
@@ -89,6 +90,17 @@ func (s *MessageSchema) Validate() error {
 			path := fmt.Sprintf("segments.%s.fields.%s", segName, fieldName)
 			if err := validateField(path, field, true); err != nil {
 				return err
+			}
+		}
+		if seg.Notes != nil {
+			if len(seg.Notes.Fields) == 0 {
+				return &SchemaError{Path: "segments." + segName + ".notes.fields", Err: errors.New("no fields defined")}
+			}
+			for fieldName, field := range seg.Notes.Fields {
+				path := fmt.Sprintf("segments.%s.notes.fields.%s", segName, fieldName)
+				if err := validateField(path, field, true); err != nil {
+					return err
+				}
 			}
 		}
 	}

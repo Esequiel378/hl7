@@ -74,15 +74,7 @@ func MarshalWithOptions(v any, opts MarshalOptions) ([]byte, error) {
 		opts.SubcomponentSeparator,
 	})
 
-	var buf bytes.Buffer
-
-	// Collect segments with their order
-	type segmentData struct {
-		name  string
-		value reflect.Value
-		order int
-	}
-	var segments []segmentData
+	var allLines [][]byte
 
 	for i := 0; i < rv.NumField(); i++ {
 		field := rv.Field(i)
@@ -91,27 +83,26 @@ func MarshalWithOptions(v any, opts MarshalOptions) ([]byte, error) {
 			continue // Skip fields without valid segment tags
 		}
 
-		segments = append(segments, segmentData{
-			name:  string(tag),
-			value: field,
-			order: i,
-		})
-	}
-
-	// Marshal each segment
-	for idx, seg := range segments {
-		line, err := marshalSegment(seg.name, seg.value, opts, encodingChars)
+		line, err := marshalSegment(string(tag), field, opts, encodingChars)
 		if err != nil {
 			return nil, err
 		}
+		allLines = append(allLines, line)
 
-		buf.Write(line)
-		if idx < len(segments)-1 {
-			buf.WriteString(opts.LineEnding)
+		notesField, ok := findNotesField(field)
+		if !ok {
+			continue
+		}
+		for j := 0; j < notesField.Len(); j++ {
+			noteLine, err := marshalSegment("NTE", notesField.Index(j), opts, encodingChars)
+			if err != nil {
+				return nil, err
+			}
+			allLines = append(allLines, noteLine)
 		}
 	}
 
-	return buf.Bytes(), nil
+	return bytes.Join(allLines, []byte(opts.LineEnding)), nil
 }
 
 // marshalSegment converts a segment struct to its HL7 representation.

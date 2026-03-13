@@ -31,9 +31,34 @@ func UnmarshalWithSchema(data []byte, schema *MessageSchema) (map[string]any, er
 
 	result := make(map[string]any)
 
+	var lastSegSchema *SegmentSchema
+	var lastSegMap map[string]any
+
 	for _, seg := range segments {
+		if seg.name == "NTE" {
+			if lastSegSchema == nil || lastSegSchema.Notes == nil {
+				continue
+			}
+			noteMap, err := decodeSegmentWithSchema(seg, lastSegSchema.Notes)
+			if err != nil {
+				return nil, err
+			}
+			if len(noteMap) == 0 {
+				continue
+			}
+			existing, ok := lastSegMap["notes"]
+			if ok {
+				lastSegMap["notes"] = append(existing.([]any), noteMap)
+			} else {
+				lastSegMap["notes"] = []any{noteMap}
+			}
+			continue
+		}
+
 		segSchema, ok := schema.Segments[string(seg.name)]
 		if !ok {
+			lastSegSchema = nil
+			lastSegMap = nil
 			continue
 		}
 
@@ -57,6 +82,9 @@ func UnmarshalWithSchema(data []byte, schema *MessageSchema) (map[string]any, er
 		} else {
 			result[string(seg.name)] = segMap
 		}
+
+		lastSegSchema = segSchema
+		lastSegMap = segMap
 	}
 
 	return result, nil
