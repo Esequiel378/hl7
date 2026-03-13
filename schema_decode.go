@@ -31,9 +31,38 @@ func UnmarshalWithSchema(data []byte, schema *MessageSchema) (map[string]any, er
 
 	result := make(map[string]any)
 
+	var lastSegSchema *SegmentSchema
+	var lastSegMap map[string]any
+
 	for _, seg := range segments {
+		if seg.name == "NTE" {
+			if lastSegSchema == nil || lastSegSchema.Notes == nil {
+				continue
+			}
+			noteMap, err := decodeSegmentWithSchema(seg, lastSegSchema.Notes)
+			if err != nil {
+				return nil, err
+			}
+			if len(noteMap) == 0 {
+				continue
+			}
+			existing, ok := lastSegMap["notes"]
+			if ok {
+				existingSlice, ok := existing.([]any)
+				if !ok {
+					return nil, fmt.Errorf("hl7: notes field has incompatible type %T; expected []any", existing)
+				}
+				lastSegMap["notes"] = append(existingSlice, noteMap)
+			} else {
+				lastSegMap["notes"] = []any{noteMap}
+			}
+			continue
+		}
+
 		segSchema, ok := schema.Segments[string(seg.name)]
 		if !ok {
+			lastSegSchema = nil
+			lastSegMap = nil
 			continue
 		}
 
@@ -57,6 +86,9 @@ func UnmarshalWithSchema(data []byte, schema *MessageSchema) (map[string]any, er
 		} else {
 			result[string(seg.name)] = segMap
 		}
+
+		lastSegSchema = segSchema
+		lastSegMap = segMap
 	}
 
 	return result, nil

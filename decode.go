@@ -127,6 +127,8 @@ func parseMessage(data []byte) ([]segmentLine, error) {
 // Unmarshal parses the HL7 data into the provided struct v.
 // v must be a pointer to a struct, and its fields should be tagged with `hl7:"segment:<name>"` for segments,
 // and `hl7:"<index>"` for fields within the segment.
+// NTE segments are attached to the preceding segment if that segment has a field tagged `hl7:"notes"`.
+// If no such field exists, NTE segments are ignored.
 func Unmarshal(data []byte, v any) error {
 	// Validate that v is a pointer to a struct
 	rv := reflect.ValueOf(v)
@@ -159,7 +161,28 @@ func Unmarshal(data []byte, v any) error {
 		return err
 	}
 
+	var lastSegment reflect.Value
+
 	for _, seg := range segments {
+		if seg.name == "NTE" {
+			if !lastSegment.IsValid() {
+				continue
+			}
+			notesField, ok := findNotesField(lastSegment)
+			if !ok {
+				continue
+			}
+			elemType := notesField.Type().Elem()
+			elem := reflect.New(elemType).Elem()
+			if elemType.Kind() == reflect.Struct {
+				if err := setValuesByIndex("NTE", elem, seg.fields, seg.fieldSeparator, seg.encodingCharacters, 0); err != nil {
+					return err
+				}
+			}
+			notesField.Set(reflect.Append(notesField, elem))
+			continue
+		}
+
 		segmentField, ok := tagToField[seg.name]
 		if !ok {
 			continue // Ignore unknown segments
@@ -169,9 +192,29 @@ func Unmarshal(data []byte, v any) error {
 		if err := setValuesByIndex(seg.name, segmentField, seg.fields, seg.fieldSeparator, seg.encodingCharacters, 0); err != nil {
 			return err
 		}
+		lastSegment = segmentField
 	}
 
 	return nil
+}
+
+// findNotesField returns the field tagged hl7:"notes" in a struct value, if any.
+// The returned field is guaranteed to be a slice whose element type is a struct.
+func findNotesField(v reflect.Value) (reflect.Value, bool) {
+	for i := 0; i < v.NumField(); i++ {
+		if v.Type().Field(i).Tag.Get("hl7") != "notes" {
+			continue
+		}
+		field := v.Field(i)
+		if field.Kind() != reflect.Slice {
+			return reflect.Value{}, false
+		}
+		if field.Type().Elem().Kind() != reflect.Struct {
+			return reflect.Value{}, false
+		}
+		return field, true
+	}
+	return reflect.Value{}, false
 }
 
 var ErrFieldIndexOutOfBounds = errors.New("hl7: field index out of bounds")
@@ -189,9 +232,13 @@ func setValuesByIndex(segment Segment, parent reflect.Value, fields []string, fs
 
 	for i := 0; i < parent.NumField(); i++ {
 		parentField := parent.Field(i)
-		sIndex, err := getHL7FieldIndexFromTag(parent.Type().Field(i).Tag.Get("hl7"))
+		tag := parent.Type().Field(i).Tag.Get("hl7")
+		sIndex, err := getHL7FieldIndexFromTag(tag)
 		if err != nil {
-			return err
+			if errors.Is(err, errTagEmpty) {
+				continue
+			}
+			return fmt.Errorf("hl7: invalid field index tag %q: %w", tag, err)
 		}
 
 		// HL7 field indexing:
@@ -304,5 +351,10 @@ func getHL7FieldIndexFromTag(tag string) (int, error) {
 	if tag == "" {
 		return 0, errTagEmpty
 	}
-	return strconv.Atoi(tag) // Convert tag to int
+	// "notes" is a reserved tag for NTE attachment; treat it like an empty tag so
+	// callers that skip errTagEmpty also skip this field without masking real mistakes.
+	if tag == "notes" {
+		return 0, errTagEmpty
+	}
+	return strconv.Atoi(tag)
 }
