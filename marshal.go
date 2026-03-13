@@ -102,6 +102,9 @@ func MarshalWithOptions(v any, opts MarshalOptions) ([]byte, error) {
 		}
 	}
 
+	if len(allLines) == 0 {
+		return []byte{}, nil
+	}
 	return bytes.Join(allLines, []byte(opts.LineEnding)), nil
 }
 

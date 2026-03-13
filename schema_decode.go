@@ -48,7 +48,11 @@ func UnmarshalWithSchema(data []byte, schema *MessageSchema) (map[string]any, er
 			}
 			existing, ok := lastSegMap["notes"]
 			if ok {
-				lastSegMap["notes"] = append(existing.([]any), noteMap)
+				existingSlice, ok := existing.([]any)
+				if !ok {
+					return nil, fmt.Errorf("hl7: notes field has incompatible type %T; expected []any", existing)
+				}
+				lastSegMap["notes"] = append(existingSlice, noteMap)
 			} else {
 				lastSegMap["notes"] = []any{noteMap}
 			}

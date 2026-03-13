@@ -93,6 +93,12 @@ func (s *MessageSchema) Validate() error {
 			}
 		}
 		if seg.Notes != nil {
+			if _, exists := seg.Fields["notes"]; exists {
+				return &SchemaError{
+					Path: "segments." + segName + ".fields.notes",
+					Err:  errors.New(`field name "notes" is reserved when segment notes are defined`),
+				}
+			}
 			if len(seg.Notes.Fields) == 0 {
 				return &SchemaError{Path: "segments." + segName + ".notes.fields", Err: errors.New("no fields defined")}
 			}

@@ -199,11 +199,20 @@ func Unmarshal(data []byte, v any) error {
 }
 
 // findNotesField returns the field tagged hl7:"notes" in a struct value, if any.
+// The returned field is guaranteed to be a slice whose element type is a struct.
 func findNotesField(v reflect.Value) (reflect.Value, bool) {
 	for i := 0; i < v.NumField(); i++ {
-		if v.Type().Field(i).Tag.Get("hl7") == "notes" {
-			return v.Field(i), true
+		if v.Type().Field(i).Tag.Get("hl7") != "notes" {
+			continue
 		}
+		field := v.Field(i)
+		if field.Kind() != reflect.Slice {
+			return reflect.Value{}, false
+		}
+		if field.Type().Elem().Kind() != reflect.Struct {
+			return reflect.Value{}, false
+		}
+		return field, true
 	}
 	return reflect.Value{}, false
 }
@@ -223,9 +232,13 @@ func setValuesByIndex(segment Segment, parent reflect.Value, fields []string, fs
 
 	for i := 0; i < parent.NumField(); i++ {
 		parentField := parent.Field(i)
-		sIndex, err := getHL7FieldIndexFromTag(parent.Type().Field(i).Tag.Get("hl7"))
+		tag := parent.Type().Field(i).Tag.Get("hl7")
+		sIndex, err := getHL7FieldIndexFromTag(tag)
 		if err != nil {
-			continue // skip empty or non-numeric tags (e.g. "notes")
+			if errors.Is(err, errTagEmpty) {
+				continue
+			}
+			return fmt.Errorf("hl7: invalid field index tag %q: %w", tag, err)
 		}
 
 		// HL7 field indexing:
@@ -338,5 +351,10 @@ func getHL7FieldIndexFromTag(tag string) (int, error) {
 	if tag == "" {
 		return 0, errTagEmpty
 	}
-	return strconv.Atoi(tag) // Convert tag to int
+	// "notes" is a reserved tag for NTE attachment; treat it like an empty tag so
+	// callers that skip errTagEmpty also skip this field without masking real mistakes.
+	if tag == "notes" {
+		return 0, errTagEmpty
+	}
+	return strconv.Atoi(tag)
 }

@@ -94,6 +94,9 @@ func MarshalWithSchemaOptions(v map[string]any, schema *MessageSchema, opts Mars
 		}
 	}
 
+	if len(allLines) == 0 {
+		return []byte{}, nil
+	}
 	return bytes.Join(allLines, []byte(opts.LineEnding)), nil
 }
 
