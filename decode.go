@@ -169,7 +169,7 @@ func Unmarshal(data []byte, v any) error {
 				continue
 			}
 			notesField, ok := findNotesField(lastSegment)
-			if !ok {
+			if !ok || !notesField.CanSet() {
 				continue
 			}
 			elemType := notesField.Type().Elem()
