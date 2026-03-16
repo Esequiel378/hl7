@@ -71,6 +71,11 @@ func UnmarshalWithSchema(data []byte, schema *MessageSchema) (map[string]any, er
 			return nil, err
 		}
 
+		// Always track the last seen segment so subsequent NTE lines are
+		// attributed to it, even when all its schema-mapped fields are empty.
+		lastSegSchema = segSchema
+		lastSegMap = segMap
+
 		if len(segMap) == 0 {
 			continue
 		}
@@ -86,9 +91,6 @@ func UnmarshalWithSchema(data []byte, schema *MessageSchema) (map[string]any, er
 		} else {
 			result[string(seg.name)] = segMap
 		}
-
-		lastSegSchema = segSchema
-		lastSegMap = segMap
 	}
 
 	return result, nil
