@@ -31,9 +31,62 @@ func UnmarshalWithSchema(data []byte, schema *MessageSchema) (map[string]any, er
 
 	result := make(map[string]any)
 
+	var lastSegSchema *SegmentSchema
+	var lastSegMap map[string]any
+	var lastSegName string
+	var lastSegStored bool
+
+	storeLastSeg := func() {
+		if lastSegStored || lastSegSchema == nil {
+			return
+		}
+		if lastSegSchema.Repeat {
+			existing, ok := result[lastSegName]
+			if ok {
+				result[lastSegName] = append(existing.([]any), lastSegMap)
+			} else {
+				result[lastSegName] = []any{lastSegMap}
+			}
+		} else {
+			result[lastSegName] = lastSegMap
+		}
+		lastSegStored = true
+	}
+
 	for _, seg := range segments {
+		if seg.name == "NTE" {
+			if lastSegSchema == nil || lastSegSchema.Notes == nil {
+				continue
+			}
+			noteMap, err := decodeSegmentWithSchema(seg, lastSegSchema.Notes)
+			if err != nil {
+				return nil, err
+			}
+			if len(noteMap) == 0 {
+				continue
+			}
+			// Ensure the preceding segment is in the result before attaching notes
+			// (it may have been skipped because all its fields were empty).
+			storeLastSeg()
+			existing, ok := lastSegMap["notes"]
+			if ok {
+				existingSlice, ok := existing.([]any)
+				if !ok {
+					return nil, fmt.Errorf("hl7: notes field has incompatible type %T; expected []any", existing)
+				}
+				lastSegMap["notes"] = append(existingSlice, noteMap)
+			} else {
+				lastSegMap["notes"] = []any{noteMap}
+			}
+			continue
+		}
+
 		segSchema, ok := schema.Segments[string(seg.name)]
 		if !ok {
+			lastSegSchema = nil
+			lastSegMap = nil
+			lastSegName = ""
+			lastSegStored = false
 			continue
 		}
 
@@ -41,6 +94,13 @@ func UnmarshalWithSchema(data []byte, schema *MessageSchema) (map[string]any, er
 		if err != nil {
 			return nil, err
 		}
+
+		// Always track the last seen segment so subsequent NTE lines are
+		// attributed to it, even when all its schema-mapped fields are empty.
+		lastSegSchema = segSchema
+		lastSegMap = segMap
+		lastSegName = string(seg.name)
+		lastSegStored = false
 
 		if len(segMap) == 0 {
 			continue
@@ -57,6 +117,7 @@ func UnmarshalWithSchema(data []byte, schema *MessageSchema) (map[string]any, er
 		} else {
 			result[string(seg.name)] = segMap
 		}
+		lastSegStored = true
 	}
 
 	return result, nil

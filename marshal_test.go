@@ -1,6 +1,7 @@
 package hl7_test
 
 import (
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -294,5 +295,96 @@ func TestMarshalWithOptions(t *testing.T) {
 	result := string(data)
 	if !strings.HasPrefix(result, "MSH#*~\\&#App") {
 		t.Errorf("Expected custom separators, got: %s", result)
+	}
+}
+
+func TestMarshalNTE(t *testing.T) {
+	type NTE struct {
+		SetID   string `hl7:"1"`
+		Comment string `hl7:"3"`
+	}
+
+	type PIDSegment struct {
+		SetID     string `hl7:"1"`
+		PatientID string `hl7:"3"`
+		Notes     []NTE  `hl7:"notes"`
+	}
+
+	type Message struct {
+		PID PIDSegment `hl7:"segment:PID"`
+	}
+
+	msg := Message{
+		PID: PIDSegment{
+			SetID:     "1",
+			PatientID: "12345",
+			Notes: []NTE{
+				{SetID: "1", Comment: "Patient has diabetes"},
+				{SetID: "2", Comment: "Also on warfarin"},
+			},
+		},
+	}
+
+	data, err := hl7.Marshal(msg)
+	if err != nil {
+		t.Fatalf("Marshal failed: %v", err)
+	}
+
+	result := string(data)
+	lines := strings.Split(result, "\r")
+
+	if len(lines) != 3 {
+		t.Fatalf("expected 3 lines (PID + 2 NTE), got %d: %q", len(lines), result)
+	}
+	if !strings.HasPrefix(lines[0], "PID|") {
+		t.Errorf("line 0 should be PID, got: %s", lines[0])
+	}
+	if lines[1] != "NTE|1||Patient has diabetes" {
+		t.Errorf("line 1 mismatch, got: %s", lines[1])
+	}
+	if lines[2] != "NTE|2||Also on warfarin" {
+		t.Errorf("line 2 mismatch, got: %s", lines[2])
+	}
+}
+
+func TestMarshalNTERoundTrip(t *testing.T) {
+	type NTE struct {
+		SetID   string `hl7:"1"`
+		Comment string `hl7:"3"`
+	}
+
+	type PIDSegment struct {
+		SetID     string `hl7:"1"`
+		PatientID string `hl7:"3"`
+		Notes     []NTE  `hl7:"notes"`
+	}
+
+	type Message struct {
+		PID PIDSegment `hl7:"segment:PID"`
+	}
+
+	original := Message{
+		PID: PIDSegment{
+			SetID:     "1",
+			PatientID: "12345",
+			Notes: []NTE{
+				{SetID: "1", Comment: "note one"},
+				{SetID: "2", Comment: "note two"},
+			},
+		},
+	}
+
+	data, err := hl7.Marshal(original)
+	if err != nil {
+		t.Fatalf("Marshal failed: %v", err)
+	}
+
+	var decoded Message
+	if err := hl7.Unmarshal(data, &decoded); err != nil {
+		t.Fatalf("Unmarshal failed: %v", err)
+	}
+
+	if !reflect.DeepEqual(original, decoded) {
+		t.Errorf("round-trip mismatch\ngot:  %+v\nwant: %+v", decoded, original)
 	}
 }

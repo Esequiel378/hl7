@@ -522,3 +522,147 @@ func TestUnmarshalWithSchemaRepeatSegments(t *testing.T) {
 		t.Errorf("OBX[1].observationValue = %v, want Normal", obx2["observationValue"])
 	}
 }
+
+func TestUnmarshalWithSchemaNTE(t *testing.T) {
+	schema := mustParseSchema(t, `{
+		"segments": {
+			"PID": {
+				"fields": {
+					"setID":     { "index": 1 },
+					"patientID": { "index": 3 }
+				},
+				"notes": {
+					"fields": {
+						"setID":   { "index": 1, "type": "int" },
+						"comment": { "index": 3 }
+					}
+				}
+			}
+		}
+	}`)
+
+	raw := "MSH|^~\\&|App|Fac|||20250101||ADT^A01|1|P|2.3\r" +
+		"PID|1||12345\r" +
+		"NTE|1||Patient has diabetes\r" +
+		"NTE|2||Also on warfarin"
+
+	result, err := hl7.UnmarshalWithSchema([]byte(raw), schema)
+	if err != nil {
+		t.Fatalf("UnmarshalWithSchema failed: %v", err)
+	}
+
+	pid, ok := result["PID"].(map[string]any)
+	if !ok {
+		t.Fatalf("PID not found in result")
+	}
+
+	notes, ok := pid["notes"].([]any)
+	if !ok {
+		t.Fatalf("notes not found in PID")
+	}
+
+	if len(notes) != 2 {
+		t.Fatalf("notes len = %d, want 2", len(notes))
+	}
+
+	note1 := notes[0].(map[string]any)
+	if note1["setID"] != int64(1) {
+		t.Errorf("note[0].setID = %v, want 1", note1["setID"])
+	}
+	if note1["comment"] != "Patient has diabetes" {
+		t.Errorf("note[0].comment = %v, want 'Patient has diabetes'", note1["comment"])
+	}
+
+	note2 := notes[1].(map[string]any)
+	if note2["comment"] != "Also on warfarin" {
+		t.Errorf("note[1].comment = %v, want 'Also on warfarin'", note2["comment"])
+	}
+}
+
+func TestUnmarshalWithSchemaNTENoNotesSchema(t *testing.T) {
+	schema := mustParseSchema(t, `{
+		"segments": {
+			"PID": {
+				"fields": {
+					"setID":     { "index": 1 },
+					"patientID": { "index": 3 }
+				}
+			}
+		}
+	}`)
+
+	raw := "MSH|^~\\&|App|Fac|||20250101||ADT^A01|1|P|2.3\r" +
+		"PID|1||12345\r" +
+		"NTE|1||This note should be ignored"
+
+	result, err := hl7.UnmarshalWithSchema([]byte(raw), schema)
+	if err != nil {
+		t.Fatalf("UnmarshalWithSchema failed: %v", err)
+	}
+
+	pid, ok := result["PID"].(map[string]any)
+	if !ok {
+		t.Fatalf("PID not found in result")
+	}
+
+	if _, ok := pid["notes"]; ok {
+		t.Error("notes should not be present when schema has no notes definition")
+	}
+}
+
+func TestUnmarshalWithSchemaNTERepeat(t *testing.T) {
+	schema := mustParseSchema(t, `{
+		"segments": {
+			"OBX": {
+				"repeat": true,
+				"fields": {
+					"setID":  { "index": 1 },
+					"value":  { "index": 5 }
+				},
+				"notes": {
+					"fields": {
+						"comment": { "index": 3 }
+					}
+				}
+			}
+		}
+	}`)
+
+	raw := "MSH|^~\\&|App|Fac|||20250101||ORU^R01|1|P|2.3\r" +
+		"OBX|1|||value one\r" +
+		"NTE|1||note for OBX 1\r" +
+		"OBX|2|||value two\r" +
+		"NTE|1||note for OBX 2"
+
+	result, err := hl7.UnmarshalWithSchema([]byte(raw), schema)
+	if err != nil {
+		t.Fatalf("UnmarshalWithSchema failed: %v", err)
+	}
+
+	obxList, ok := result["OBX"].([]any)
+	if !ok {
+		t.Fatalf("OBX not found or not a slice")
+	}
+
+	if len(obxList) != 2 {
+		t.Fatalf("OBX len = %d, want 2", len(obxList))
+	}
+
+	obx1 := obxList[0].(map[string]any)
+	notes1, ok := obx1["notes"].([]any)
+	if !ok || len(notes1) != 1 {
+		t.Fatalf("OBX[0] notes len = %d, want 1", len(notes1))
+	}
+	if notes1[0].(map[string]any)["comment"] != "note for OBX 1" {
+		t.Errorf("OBX[0] note comment mismatch: %v", notes1[0])
+	}
+
+	obx2 := obxList[1].(map[string]any)
+	notes2, ok := obx2["notes"].([]any)
+	if !ok || len(notes2) != 1 {
+		t.Fatalf("OBX[1] notes len = %d, want 1", len(notes2))
+	}
+	if notes2[0].(map[string]any)["comment"] != "note for OBX 2" {
+		t.Errorf("OBX[1] note comment mismatch: %v", notes2[0])
+	}
+}
