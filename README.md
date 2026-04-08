@@ -17,6 +17,7 @@ A lightweight, dependency-free Go library for parsing and building HL7 v2.x mess
 - **Timestamp Type**: Built-in `hl7.Timestamp` type for automatic date/time parsing
 - **Custom Types**: Implement `Unmarshaler` or `Marshaler` interfaces for custom field handling
 - **Version Agnostic**: Supports any HL7 v2.x version
+- **NTE (Notes) Support**: Automatically attach NTE segments to the preceding segment in all parsing modes
 - **Rich Errors**: Field-level error context for easier debugging
 - **Dependency-Free**: No external dependencies
 
@@ -357,6 +358,81 @@ opts := hl7.MarshalOptions{
 data, err := hl7.MarshalWithOptions(msg, opts)
 ```
 
+### NTE (Notes and Comments) Segments
+
+NTE segments in HL7 attach free-text notes to the segment that precedes them. This library automatically associates NTE segments with their parent segment in all parsing modes.
+
+#### Struct-Based
+
+Add a slice field tagged `hl7:"notes"` to any segment struct. NTE segments following that segment are collected into the slice:
+
+```go
+type NTE struct {
+    SetID   string `hl7:"1"`
+    Comment string `hl7:"3"`
+}
+
+type PIDSegment struct {
+    SetID     string `hl7:"1"`
+    PatientID string `hl7:"3"`
+    Notes     []NTE  `hl7:"notes"` // NTE segments following PID are collected here
+}
+
+type OBXSegment struct {
+    SetID            string `hl7:"1"`
+    ObservationValue string `hl7:"5"`
+    Notes            []NTE  `hl7:"notes"` // each OBX accumulates its own notes
+}
+
+type ORUMessage struct {
+    MSH MSHSegment `hl7:"segment:MSH"`
+    PID PIDSegment `hl7:"segment:PID"`
+    OBX OBXSegment `hl7:"segment:OBX"`
+}
+```
+
+Marshaling preserves NTE segments — they are emitted immediately after their parent segment.
+
+#### Schema-Based
+
+Add a `"notes"` key to any segment schema with its own `"fields"` definition:
+
+```json
+{
+    "segments": {
+        "PID": {
+            "fields": {
+                "setID":     { "index": 1 },
+                "patientID": { "index": 3 }
+            },
+            "notes": {
+                "fields": {
+                    "setID":   { "index": 1, "type": "int" },
+                    "comment": { "index": 3 }
+                }
+            }
+        }
+    }
+}
+```
+
+Parsed NTE data appears under a `"notes"` key as `[]any` in the result map:
+
+```go
+pid := result["PID"].(map[string]any)
+notes := pid["notes"].([]any)
+for _, n := range notes {
+    note := n.(map[string]any)
+    fmt.Printf("[%v] %s\n", note["setID"], note["comment"])
+}
+```
+
+> **Note:** The field name `"notes"` is reserved when a segment defines a `"notes"` schema. Using it as a regular field name will produce a schema validation error.
+
+#### Generic
+
+In generic parsing, NTE segments appear as standalone segments in the `Segments` slice, preserving their position in the message.
+
 ### HL7 to JSON Conversion
 
 A common integration pattern for bridging HL7 v2 systems with modern REST/JSON APIs:
@@ -566,6 +642,8 @@ Complete runnable examples are available in the [`examples/`](./examples) direct
 - [`struct-based`](./examples/struct-based) - Traditional struct tag approach
 - [`schema-based`](./examples/schema-based) - Dynamic JSON schema parsing
 - [`generic`](./examples/generic) - Schema-less parsing
+- [`notes-struct-based`](./examples/notes-struct-based) - NTE segment handling with struct tags
+- [`notes-schema-based`](./examples/notes-schema-based) - NTE segment handling with JSON schemas
 - [`hl7-to-json`](./examples/hl7-to-json) - HL7/JSON conversion pipeline
 - [`cli`](./examples/cli) - Sample files for the `hl7` CLI tool
 
