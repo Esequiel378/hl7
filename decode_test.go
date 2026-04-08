@@ -492,3 +492,114 @@ func TestUnmarshalWithTimestamp(t *testing.T) {
 		t.Errorf("PatientID = %q, want %q", got.PID.PatientID, "12345")
 	}
 }
+
+func TestUnmarshalNTE(t *testing.T) {
+	type NTE struct {
+		SetID   string `hl7:"1"`
+		Comment string `hl7:"3"`
+	}
+
+	type PIDSegment struct {
+		SetID     string `hl7:"1"`
+		PatientID string `hl7:"3"`
+		Notes     []NTE  `hl7:"notes"`
+	}
+
+	type Message struct {
+		PID PIDSegment `hl7:"segment:PID"`
+	}
+
+	raw := "MSH|^~\\&|App|Fac|||20250101||ADT^A01|1|P|2.3\r" +
+		"PID|1||12345\r" +
+		"NTE|1||Patient has diabetes\r" +
+		"NTE|2||Also on warfarin"
+
+	var got Message
+	if err := hl7.Unmarshal([]byte(raw), &got); err != nil {
+		t.Fatalf("Unmarshal failed: %v", err)
+	}
+
+	if got.PID.SetID != "1" {
+		t.Errorf("SetID = %q, want %q", got.PID.SetID, "1")
+	}
+
+	if len(got.PID.Notes) != 2 {
+		t.Fatalf("Notes len = %d, want 2", len(got.PID.Notes))
+	}
+
+	expected := []NTE{
+		{SetID: "1", Comment: "Patient has diabetes"},
+		{SetID: "2", Comment: "Also on warfarin"},
+	}
+	if !reflect.DeepEqual(got.PID.Notes, expected) {
+		t.Errorf("Notes mismatch\ngot:  %+v\nwant: %+v", got.PID.Notes, expected)
+	}
+}
+
+func TestUnmarshalNTENoNotesField(t *testing.T) {
+	type PIDSegment struct {
+		SetID     string `hl7:"1"`
+		PatientID string `hl7:"3"`
+		// no Notes field — NTE segments should be silently ignored
+	}
+
+	type Message struct {
+		PID PIDSegment `hl7:"segment:PID"`
+	}
+
+	raw := "MSH|^~\\&|App|Fac|||20250101||ADT^A01|1|P|2.3\r" +
+		"PID|1||12345\r" +
+		"NTE|1||This note should be ignored"
+
+	var got Message
+	if err := hl7.Unmarshal([]byte(raw), &got); err != nil {
+		t.Fatalf("Unmarshal failed: %v", err)
+	}
+
+	if got.PID.PatientID != "12345" {
+		t.Errorf("PatientID = %q, want %q", got.PID.PatientID, "12345")
+	}
+}
+
+func TestUnmarshalNTEMultipleSegments(t *testing.T) {
+	type NTE struct {
+		Comment string `hl7:"3"`
+	}
+
+	type MSHSegment struct {
+		FieldSeparator     string `hl7:"1"`
+		EncodingCharacters string `hl7:"2"`
+		Notes              []NTE  `hl7:"notes"`
+	}
+
+	type PIDSegment struct {
+		SetID     string `hl7:"1"`
+		PatientID string `hl7:"3"`
+		Notes     []NTE  `hl7:"notes"`
+	}
+
+	type Message struct {
+		MSH MSHSegment `hl7:"segment:MSH"`
+		PID PIDSegment `hl7:"segment:PID"`
+	}
+
+	raw := "MSH|^~\\&|App|Fac|||20250101||ADT^A01|1|P|2.3\r" +
+		"NTE|1||MSH note\r" +
+		"PID|1||12345\r" +
+		"NTE|1||PID note one\r" +
+		"NTE|2||PID note two"
+
+	var got Message
+	if err := hl7.Unmarshal([]byte(raw), &got); err != nil {
+		t.Fatalf("Unmarshal failed: %v", err)
+	}
+
+	if len(got.MSH.Notes) != 1 || got.MSH.Notes[0].Comment != "MSH note" {
+		t.Errorf("MSH.Notes = %+v, want [{Comment: MSH note}]", got.MSH.Notes)
+	}
+
+	expectedPIDNotes := []NTE{{Comment: "PID note one"}, {Comment: "PID note two"}}
+	if !reflect.DeepEqual(got.PID.Notes, expectedPIDNotes) {
+		t.Errorf("PID.Notes mismatch\ngot:  %+v\nwant: %+v", got.PID.Notes, expectedPIDNotes)
+	}
+}
