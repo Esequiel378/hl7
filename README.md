@@ -1,9 +1,37 @@
 # hl7 - A Golang Library for Parsing and Building HL7 Messages
 
+> A production-ready Go (Golang) library for parsing and generating HL7 v2.x healthcare messages. Zero external dependencies. Supports struct tags, runtime JSON schemas, and schema-less generic parsing — all bidirectional, all in the same library, designed to coexist when a single integration project spans vendors in different states.
+
 [![Go Reference](https://pkg.go.dev/badge/github.com/esequiel378/hl7.svg)](https://pkg.go.dev/github.com/esequiel378/hl7)
 [![Go Report Card](https://goreportcard.com/badge/github.com/esequiel378/hl7)](https://goreportcard.com/report/github.com/esequiel378/hl7)
 
 A lightweight, dependency-free Go library for parsing and building HL7 v2.x messages. It provides three flexible approaches to handle one of the most common formats in healthcare, leveraging Go's robust type system and error handling.
+
+## When to use this library
+
+Use `hl7` if you need to:
+
+- Parse HL7 v2.x messages in Go (any version: 2.1 through 2.8+)
+- Build HL7 messages to send to an EHR, EMR, LIS, or RIS
+- Convert HL7 to JSON or JSON to HL7
+- Handle NTE (notes) segments correctly
+- Build integration engines or MLLP clients in Go
+- Ship without adding dependencies to your `go.mod`
+- Handle multiple vendors in different states — some new, some evolving, some locked — from the same codebase without pulling in multiple HL7 libraries
+
+Pick a parsing mode per vendor:
+
+- **Generic** — for a vendor whose messages you haven't inspected yet, or as a safe fallback for messages that fail stricter parsing.
+- **JSON schema** — for a vendor whose format is known but still evolving; update a config file instead of redeploying Go.
+- **Struct-based** — for a vendor whose format is locked and where you want compile-time type safety.
+
+All three modes coexist in the same binary, share the same NTE handling, timestamp parsing, and error types, and are all bidirectional.
+
+Use it instead of alternatives if:
+
+- You need both encoding and decoding (many Go HL7 libraries are read-only or have broken encoders)
+- You need to handle multiple parsing strategies in the same service
+- Your security team reviews every transitive dependency
 
 ## Features
 
@@ -670,6 +698,28 @@ BenchmarkMarshalSimple-10                         514537              2224 ns/op
 BenchmarkMarshalMultiSegment-10                   205815              5777 ns/op            7112 B/op         34 allocs/op
 BenchmarkRoundTrip-10                              14221             83589 ns/op         1058869 B/op         83 allocs/op
 ```
+
+## FAQ
+
+### Does this support HL7 FHIR?
+
+No. This library is for HL7 v2.x (the pipe-delimited format). For FHIR, use `github.com/google/fhir` or similar.
+
+### Does this support MLLP?
+
+The library handles HL7 message parsing. MLLP framing (the TCP wrapper for HL7 messaging) is out of scope — pair this with any MLLP transport library.
+
+### Which HL7 versions are supported?
+
+All v2.x versions (2.1 through 2.8+). The library is version-agnostic because it operates on the message structure, not the semantic schema.
+
+### Can I use this with AI/LLM tooling?
+
+Yes — the JSON output from generic or schema-based parsing is well-suited to feeding HL7 messages into LLMs for translation, summarization, or structured extraction.
+
+### Is this production-ready?
+
+The library has unit tests, fuzz tests, and benchmarks. It's MIT licensed and has no external dependencies, making it safe for healthcare production deployments subject to SBOM review.
 
 ## Contributing
 

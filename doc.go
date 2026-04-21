@@ -1,4 +1,39 @@
-// Package hl7 provides utilities to marshal and unmarshal HL7 v2.x messages.
+// Package hl7 provides encoding and decoding of HL7 v2.x healthcare
+// messages in Go. It supports three parsing modes — struct-based,
+// JSON schema-based, and generic (schema-less) — all of which are
+// bidirectional (decode and encode) and designed to coexist in the
+// same application.
+//
+// # Choosing a parsing mode
+//
+// A real HL7 integration often handles multiple vendors in different
+// states at the same time. This library offers three parsing modes
+// that can all be used in the same service, sharing the same internals
+// (NTE attachment, timestamp parsing, error types, encoding rules).
+//
+// Use struct-based parsing for vendors whose message formats are
+// known and stable, when you want compile-time type safety:
+//
+//	var msg MyMessage
+//	err := hl7.Unmarshal(data, &msg)
+//
+// Use schema-based parsing for vendors whose formats are known but
+// evolving, when you want to update a config file instead of
+// redeploying:
+//
+//	schema, _ := hl7.LoadSchemaFile("vendor.json")
+//	result, _ := hl7.UnmarshalWithSchema(data, schema)
+//
+// Use generic parsing for unknown or experimental vendors, and as a
+// safe fallback path for messages that fail stricter parsing:
+//
+//	msg, _ := hl7.ParseGeneric(data)
+//
+// # Features
+//
+// The library has zero external dependencies, supports every HL7 v2.x
+// version, handles NTE segment attachment automatically, and ships with
+// a CLI tool for HL7-to-JSON conversion.
 //
 // # Tagging
 //
@@ -33,15 +68,6 @@
 //
 //   - [FieldError] provides context about which segment and field caused an error.
 //   - Use errors.As to extract field-level error information.
-//
-// # Example
-//
-//	// Unmarshal
-//	var msg MyMessage
-//	err := hl7.Unmarshal(data, &msg)
-//
-//	// Marshal
-//	data, err := hl7.Marshal(msg)
 //
 // See the README for comprehensive examples and usage patterns.
 package hl7
